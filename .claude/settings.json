@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/guard.js",
+            "timeout": 15,
+            "statusMessage": "Verificando as regras do VIO..."
+          }
+        ]
+      }
+    ]
+  }
+}
