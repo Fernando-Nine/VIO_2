@@ -3,7 +3,7 @@
 Arquivo vivo. O `CLAUDE.md` guarda as regras permanentes (e fica curto de propósito); **este
 guarda onde estamos**. Substitui o antigo `ESTADO-DO-PROJETO.md`, que ficou desatualizado.
 
-Última atualização: **15/09/2026** · Versão do app: **1.3.0**
+Última atualização: **15/09/2026** · Versão do app: **1.4.0**
 
 ---
 
@@ -46,6 +46,21 @@ nativo específico pro Safari do iPhone.
 real da conexão de vídeo; aviso na tela quando uma conexão específica falha; controles somem
 sozinhos com a inatividade.
 
+**PWA** (1.4.0) — `manifest.json` + service worker mínimo. Instalável no celular e no PC, abre
+em janela própria, e a tela de entrada carrega sem rede. O SW é rede-primeiro e tem escopo
+deliberadamente estreito: `/api/` e o transporte do Socket.IO nunca passam por ele — a única
+exceção sob `/socket.io/` é o `socket.io.js`, que é arquivo estático e parte do shell. Não
+chama `skipWaiting()`, para não trocar código por baixo de quem está compartilhando.
+
+> **Ícone provisório.** `public/icon-192.png`, `icon-512.png` e `icon-maskable-512.png` são a
+> própria marca da tela de entrada (glifo de monitor sobre o `--grad-marca`) renderizada
+> grande — não são arte nova. A arte definitiva continua sendo do Midjourney (seção 4).
+> Trocar os três arquivos basta; o `manifest.json` não muda.
+
+> **Service worker exige contexto seguro.** Em `https://` e em `localhost` funciona; em
+> `http://` num IP da rede local — o teste pelo Radmin — o navegador não registra, e o app roda
+> igual, só sem instalar. Não é defeito: para ver a instalação funcionando é preciso HTTPS.
+
 **Reconexão** (1.3.0) — queda de rede ou restart do servidor: o cliente volta sozinho para a
 sala, sem F5. O `socket.id` muda na volta, então todos os mapas indexados por id são refeitos
 do zero a partir do `room-state`. Quem estava compartilhando volta compartilhando — o
@@ -63,7 +78,6 @@ changelog dentro do app; AGPLv3.
 
 ## 3. O que NÃO existe (apesar de discutido)
 
-- **PWA** — não existe `manifest.json` nem service worker. "Instalável" hoje é zero.
 - **Chat de voz** — foi desenhado em detalhe e chegou a existir um `voz.js` numa sessão que se
   perdeu antes de salvar. O código não existe. Os ícones já estão baixados em `public/icons/`
   (`microphone`, `microphone-slash`, `headphones`, `noise-cancelling-headphones`).

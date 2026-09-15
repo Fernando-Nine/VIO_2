@@ -1,5 +1,13 @@
 [
   {
+    "versao": "1.4.0",
+    "data": "2026-09-15",
+    "mudancas": [
+      { "tipo": "adicionado", "texto": "O VIO agora é instalável: dá para adicionar à tela inicial do celular ou instalar como aplicativo no computador, e ele abre em janela própria. O ícone é provisório — a própria marca da tela de entrada ampliada — até a arte definitiva existir." },
+      { "tipo": "adicionado", "texto": "A tela de entrada abre mesmo sem internet. Entrar numa sala continua exigindo conexão, naturalmente: o que fica disponível offline é só a casca do app." }
+    ]
+  },
+  {
     "versao": "1.3.0",
     "data": "2026-09-15",
     "mudancas": [

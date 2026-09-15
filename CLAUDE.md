@@ -82,7 +82,7 @@ com o mesmo conteúdo: `package.json`, `@CHANGELOG.md` e `@public/changelog.json
 app exibe quando se toca no número da versão) — **[HOOK]**: o commit falha se `version` mudar
 sem os outros dois. O app lê a versão de `/api/version`, servida a partir do `package.json`.
 
-Semver: correção = PATCH, feature nova = MINOR. Versão atual: 1.3.0.
+Semver: correção = PATCH, feature nova = MINOR. Versão atual: 1.4.0.
 
 ## Estrutura de pastas
 
@@ -103,24 +103,25 @@ vio/
     index.html
     app.js             cliente inteiro
     style.css
+    sw.js              service worker — nunca encosta em /socket.io/ nem em sala
+    manifest.json      PWA
+    icon-*.png         ícones do PWA (provisórios, ver @ESTADO.md)
     changelog.json     espelho do CHANGELOG.md, lido pelo app
-    icons/*.svg
+    icons/*.svg        ícones de interface (mask-image)
 ```
 
 ## Roadmap — nesta ordem
 
-1. **PWA instalável**. `manifest.json` + service worker mínimo. O SW cacheia só o shell
-   (html/css/js/ícones), **nunca** `/socket.io/` nem estado de sala. Estratégia network-first.
-2. **Chat de voz**. Conexões separadas; sempre-para-todos (diferente da tela, que é sob
+1. **Chat de voz**. Conexões separadas; sempre-para-todos (diferente da tela, que é sob
    demanda) — é daí que vem o teto de ~6 pessoas. Microfone usa processamento **ligado**,
    o oposto do áudio de tela.
-3. **Câmera**. Conexões separadas; troca frontal/traseira no celular.
-4. **TURN**. Ligado por variável de ambiente, com credenciais efêmeras. Já há um caso
+2. **Câmera**. Conexões separadas; troca frontal/traseira no celular.
+3. **TURN**. Ligado por variável de ambiente, com credenciais efêmeras. Já há um caso
    confirmado de quem não conecta sem ele (NAT simétrico) — ver `@ESTADO.md`.
-5. **Tauri + WASAPI**. Não é "empacotar o front-end": exige captura de áudio por processo em
+4. **Tauri + WASAPI**. Não é "empacotar o front-end": exige captura de áudio por processo em
    Rust e injetar esse áudio na PeerConnection da WebView2. É o item mais caro da lista.
 
-Reconexão saiu daqui na 1.3.0 — está implementada.
+Reconexão (1.3.0) e PWA (1.4.0) saíram daqui — estão implementadas.
 
 ## Segurança — pendências já mapeadas
 

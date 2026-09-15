@@ -7,6 +7,16 @@ segue [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAJOR.MINOR.PA
 O mesmo conteúdo fica disponível dentro do próprio app, tocando no número da versão na
 tela de entrada.
 
+## [1.4.0] - 2026-09-15
+
+### Adicionado
+- O VIO agora é instalável: dá para adicionar à tela inicial do celular ou
+  instalar como aplicativo no computador, e ele abre em janela própria. O ícone
+  é provisório — a própria marca da tela de entrada ampliada — até a arte
+  definitiva existir.
+- A tela de entrada abre mesmo sem internet. Entrar numa sala continua exigindo
+  conexão, naturalmente: o que fica disponível offline é só a casca do app.
+
 ## [1.3.0] - 2026-09-15
 
 ### Adicionado

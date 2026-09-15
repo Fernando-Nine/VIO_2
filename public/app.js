@@ -1296,3 +1296,23 @@ function pararMedicaoPing() {
   clearInterval(intervalPing);
   intervalPing = null;
 }
+
+// ---------------------------------------------------------------------------
+// Service worker (PWA)
+//
+// So existe pra deixar o app instalavel e pra tela de entrada abrir sem rede.
+// Ele nao encosta na sinalizacao nem em estado de sala — ver @public/sw.js.
+//
+// Registra depois do load pra nao disputar banda com o que a pagina precisa
+// pra funcionar, e falha em silencio de proposito: em contexto inseguro (http
+// num IP da rede local, como no teste pelo Radmin) o navegador simplesmente
+// nao registra, e o VIO continua funcionando igual, so sem instalar.
+// ---------------------------------------------------------------------------
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((erro) => {
+      console.warn('[VIO] service worker nao registrado:', erro.message);
+    });
+  });
+}
