@@ -73,6 +73,13 @@ const btnTelaCheia = document.getElementById('btn-tela-cheia');
 const btnAjustes = document.getElementById('btn-ajustes');
 const btnMicrofone = document.getElementById('btn-microfone');
 const iconeMicrofone = document.getElementById('icone-microfone');
+const btnFone = document.getElementById('btn-fone');
+const iconeFone = document.getElementById('icone-fone');
+const blocoMicrofone = document.getElementById('bloco-microfone');
+const rangeSensibilidade = document.getElementById('range-sensibilidade');
+const valorSensibilidade = document.getElementById('valor-sensibilidade');
+const chkEco = document.getElementById('chk-eco');
+const chkRuido = document.getElementById('chk-ruido');
 const btnCompartilhar = document.getElementById('btn-compartilhar');
 const medidorVozLocal = document.getElementById('medidor-voz-local');
 
@@ -133,6 +140,11 @@ const estado = {
   voiceIds: new Set(), // quem esta no canal de voz (pode me incluir)
   vozStream: null, // meu microfone, se eu estiver na voz
   vozMudo: false, // mudo local: a conexao continua, a track e que para de mandar
+  vozSurdo: false, // "fone desligado": nao ouco ninguem E nao mando nada
+  mudosLocais: new Set(), // pessoas que EU silenciei — so pra mim, ninguem sabe
+  micEco: true, // cancelamento de eco
+  micRuido: true, // supressao de ruido
+  micSensibilidade: 8, // portao: abaixo desse nivel o microfone nao transmite (0 = sempre aberto)
 };
 
 const outgoingPCs = new Map(); // peerId -> RTCPeerConnection (uso pra cada pessoa que assiste MEU compartilhamento)
@@ -508,6 +520,21 @@ function renderizarParticipantes() {
       badge.className = 'etiqueta-compartilhando';
       badge.textContent = 'compartilhando';
       item.appendChild(badge);
+    }
+
+    // Silenciar alguem e decisao SO SUA: nao vai pro servidor, a pessoa nao
+    // fica sabendo, e some quando voce sai da sala.
+    if (!souEu && estado.voiceIds.has(id)) {
+      const calado = estado.mudosLocais.has(id);
+      const botao = document.createElement('button');
+      botao.type = 'button';
+      botao.className = 'btn-silenciar';
+      botao.innerHTML = `<span class="icone ${calado ? 'icone-volume-slash' : 'icone-volume'}" aria-hidden="true"></span>`;
+      botao.setAttribute('aria-pressed', String(calado));
+      botao.setAttribute('aria-label', calado ? `Voltar a ouvir ${nome}` : `Silenciar ${nome} só pra você`);
+      botao.title = botao.getAttribute('aria-label');
+      botao.addEventListener('click', () => alternarMudoDe(id));
+      item.appendChild(botao);
     }
     return item;
   };
@@ -1347,10 +1374,10 @@ async function ligarMicrofone() {
     estado.vozStream = await navigator.mediaDevices.getUserMedia({
       // LIGADOS de proposito — o oposto do audio de tela. Aqui e voz de
       // microfone, exatamente o caso pra que esses processamentos existem.
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      audio: { echoCancellation: estado.micEco, noiseSuppression: estado.micRuido, autoGainControl: true },
       video: false,
     });
-    monitorarNivel(socket.id, estado.vozStream);
+    ligarMonitor(estado.vozStream);
     return true;
   } catch (erro) {
     if (erro.name === 'NotAllowedError') {
@@ -1365,14 +1392,46 @@ async function ligarMicrofone() {
 async function entrarNaVoz() {
   if (!(await ligarMicrofone())) return;
   estado.vozMudo = false;
-  aplicarMudo();
+  estado.vozSurdo = false;
+  aplicarEstadoMicrofone();
   socket.emit('start-voice');
 }
 
-function aplicarMudo() {
+// Estado final da minha track de audio. Tres coisas podem fechar o microfone, e
+// a ordem importa: mudo e surdez sao decisao do usuario e ganham do portao.
+let portaoAberto = true;
+
+// O portao fecha a track com enabled=false — e uma track desabilitada entrega
+// silencio pro WebAudio, o que faria o medidor ler zero e o portao nunca mais
+// reabrir. Por isso medimos um CLONE, que fica sempre habilitado.
+let trackMonitor = null;
+
+function ligarMonitor(stream) {
+  desligarMonitor();
+  const original = stream.getAudioTracks()[0];
+  if (!original) return;
+  trackMonitor = original.clone();
+  analisadoresVoz.delete(socket.id);
+  monitorarNivel(socket.id, new MediaStream([trackMonitor]));
+}
+
+function desligarMonitor() {
+  if (trackMonitor) trackMonitor.stop();
+  trackMonitor = null;
+}
+
+function aplicarEstadoMicrofone() {
   if (!estado.vozStream) return;
-  estado.vozStream.getAudioTracks().forEach((t) => { t.enabled = !estado.vozMudo; });
-  if (estado.vozMudo) definirNivel(socket.id, 0);
+  const transmitir = !estado.vozMudo && !estado.vozSurdo && portaoAberto;
+  estado.vozStream.getAudioTracks().forEach((t) => { t.enabled = transmitir; });
+}
+
+// Silencia o que CHEGA: a surdez cala todo mundo, e mudosLocais cala so quem eu
+// escolhi. Nenhum dos dois e sinalizado — a outra pessoa nao fica sabendo.
+function aplicarAudioDeEntrada() {
+  audiosVoz.forEach((el, id) => {
+    el.muted = estado.vozSurdo || estado.mudosLocais.has(id);
+  });
 }
 
 function alternarMicrofone() {
@@ -1380,17 +1439,41 @@ function alternarMicrofone() {
     entrarNaVoz();
     return;
   }
-  // Ja estou na voz: o botao vira mudo. A conexao continua viva, entao eu
-  // continuo ouvindo todo mundo — so paro de mandar.
   estado.vozMudo = !estado.vozMudo;
-  aplicarMudo();
+  // Sair do mudo com o fone desligado nao faria sentido: religa os dois juntos.
+  if (!estado.vozMudo && estado.vozSurdo) estado.vozSurdo = false;
+  aplicarEstadoMicrofone();
+  aplicarAudioDeEntrada();
   atualizarBotaoMicrofone();
   mostrarAlerta(estado.vozMudo ? 'Microfone desligado. Você continua ouvindo.' : 'Microfone ligado.');
 }
 
+// Guarda como o microfone estava antes da surdez, pra devolver do jeito que
+// estava. Sem isso, voltar a ouvir deixava a pessoa muda sem ela pedir.
+let mudoAntesDaSurdez = false;
+
+function alternarFone() {
+  if (!estado.voiceIds.has(socket.id)) return;
+  estado.vozSurdo = !estado.vozSurdo;
+
+  if (estado.vozSurdo) {
+    // Silenciar tudo inclui o proprio microfone: seria estranho continuar
+    // falando pra uma conversa que voce nao ouve.
+    mudoAntesDaSurdez = estado.vozMudo;
+    estado.vozMudo = true;
+  } else {
+    estado.vozMudo = mudoAntesDaSurdez;
+  }
+
+  aplicarEstadoMicrofone();
+  aplicarAudioDeEntrada();
+  atualizarBotaoMicrofone();
+  mostrarAlerta(estado.vozSurdo ? 'Conversa silenciada — microfone e áudio.' : 'Conversa de volta.');
+}
+
 function atualizarBotaoMicrofone() {
   const naVoz = estado.voiceIds.has(socket.id);
-  const mandando = naVoz && !estado.vozMudo;
+  const mandando = naVoz && !estado.vozMudo && !estado.vozSurdo;
 
   iconeMicrofone.classList.toggle('icone-microphone', mandando);
   iconeMicrofone.classList.toggle('icone-microphone-slash', !mandando);
@@ -1402,8 +1485,81 @@ function atualizarBotaoMicrofone() {
   );
   btnMicrofone.title = btnMicrofone.getAttribute('aria-label');
 
+  btnFone.classList.toggle('oculto', !naVoz);
+  btnFone.classList.toggle('cortado', estado.vozSurdo);
+  btnFone.classList.toggle('ativo', naVoz && !estado.vozSurdo);
+  btnFone.setAttribute('aria-pressed', String(estado.vozSurdo));
+  btnFone.setAttribute('aria-label', estado.vozSurdo ? 'Voltar a ouvir a conversa' : 'Silenciar a conversa inteira');
+  btnFone.title = estado.vozSurdo
+    ? 'Voltar a ouvir a conversa'
+    : 'Silenciar a conversa inteira (microfone e áudio)';
+
   if (medidorVozLocal) medidorVozLocal.classList.toggle('oculto', !naVoz);
+  if (blocoMicrofone) blocoMicrofone.classList.toggle('oculto', !naVoz);
 }
+
+// ---- ajustes do proprio microfone ----
+
+async function aplicarAjustesMicrofone() {
+  if (!estado.vozStream) return;
+  const track = estado.vozStream.getAudioTracks()[0];
+  if (!track) return;
+
+  const restricoes = { echoCancellation: estado.micEco, noiseSuppression: estado.micRuido };
+  try {
+    await track.applyConstraints(restricoes);
+  } catch {
+    // Nem todo navegador troca eco/ruido num track ja aberto. Nesse caso pega um
+    // microfone novo e substitui nos senders — as conexoes continuam de pe.
+    await trocarTrackDeMicrofone(restricoes);
+  }
+}
+
+async function trocarTrackDeMicrofone(restricoes) {
+  try {
+    const novo = await navigator.mediaDevices.getUserMedia({
+      audio: { ...restricoes, autoGainControl: true },
+      video: false,
+    });
+    const trackNovo = novo.getAudioTracks()[0];
+
+    await Promise.all([...vozPCs.values()].map((pc) => {
+      const sender = pc.getSenders().find((s) => s.track && s.track.kind === 'audio');
+      return sender ? sender.replaceTrack(trackNovo) : Promise.resolve();
+    }));
+
+    estado.vozStream.getTracks().forEach((t) => t.stop());
+    estado.vozStream = novo;
+    ligarMonitor(novo);
+    aplicarEstadoMicrofone();
+  } catch (erro) {
+    mostrarAlerta('Não consegui aplicar esse ajuste do microfone: ' + erro.message, 5000);
+  }
+}
+
+function alternarMudoDe(peerId) {
+  if (estado.mudosLocais.has(peerId)) estado.mudosLocais.delete(peerId);
+  else estado.mudosLocais.add(peerId);
+  aplicarAudioDeEntrada();
+  renderizarParticipantes();
+}
+
+btnFone.addEventListener('click', alternarFone);
+
+rangeSensibilidade.addEventListener('input', () => {
+  estado.micSensibilidade = Number(rangeSensibilidade.value);
+  valorSensibilidade.textContent = estado.micSensibilidade === 0 ? 'sempre aberto' : String(estado.micSensibilidade);
+});
+
+chkEco.addEventListener('change', () => {
+  estado.micEco = chkEco.checked;
+  aplicarAjustesMicrofone();
+});
+
+chkRuido.addEventListener('change', () => {
+  estado.micRuido = chkRuido.checked;
+  aplicarAjustesMicrofone();
+});
 
 // No desktop o title ja aparece sozinho no hover; no toque nao existe hover,
 // entao o mesmo texto vira alerta.
@@ -1424,6 +1580,7 @@ function reproduzirVoz(peerId, stream) {
     document.body.appendChild(el);
   }
   if (el.srcObject !== stream) el.srcObject = stream;
+  el.muted = estado.vozSurdo || estado.mudosLocais.has(peerId);
   el.play().catch(() => {
     // navegador segurando o audio ate um gesto: o proprio botao de microfone
     // ja e um gesto, entao na pratica isso quase nao acontece
@@ -1446,18 +1603,41 @@ function monitorarNivel(peerId, stream) {
   }
 }
 
-function definirNivel(peerId, nivel) {
-  niveisVoz.set(peerId, nivel);
+function definirNivel(peerId, nivel, transmitindo = true) {
+  niveisVoz.set(peerId, transmitindo ? nivel : 0);
 
   const item = listaParticipantes.querySelector(`li[data-id="${CSS.escape(peerId)}"] .avatar-participante`);
-  if (item) item.classList.toggle('falando', nivel > LIMIAR_FALANDO);
+  if (item) item.classList.toggle('falando', transmitindo && nivel > LIMIAR_FALANDO);
 
   if (peerId === socket.id && medidorVozLocal) {
-    medidorVozLocal.style.setProperty('--nivel', nivel);
+    medidorVozLocal.style.setProperty('--nivel', nivel); // sempre o cru
   }
 }
 
 let rafNivel = null;
+
+// Portao de ruido: abre na hora que a voz passa do limiar, e so fecha depois de
+// um tempinho de silencio — fechar na primeira pausa cortaria o fim das frases.
+const ESPERA_PRA_FECHAR_MS = 400;
+let fechaPortaoEm = 0;
+
+function avaliarPortao(nivelCru) {
+  if (estado.micSensibilidade === 0) {
+    portaoAberto = true;
+  } else if (nivelCru >= estado.micSensibilidade) {
+    portaoAberto = true;
+    fechaPortaoEm = 0;
+  } else if (portaoAberto) {
+    const agora = performance.now();
+    if (fechaPortaoEm === 0) {
+      fechaPortaoEm = agora + ESPERA_PRA_FECHAR_MS;
+    } else if (agora >= fechaPortaoEm) {
+      portaoAberto = false;
+      fechaPortaoEm = 0;
+    }
+  }
+  aplicarEstadoMicrofone();
+}
 
 function loopNivelVoz() {
   analisadoresVoz.forEach(({ analisador, dados }, peerId) => {
@@ -1468,7 +1648,16 @@ function loopNivelVoz() {
       soma += v * v;
     }
     const rms = Math.sqrt(soma / dados.length);
-    definirNivel(peerId, Math.min(100, Math.round(rms * 400)));
+    const nivel = Math.min(100, Math.round(rms * 400));
+
+    if (peerId === socket.id) {
+      avaliarPortao(nivel); // o meu nivel vem do clone, entao e sempre o cru
+      // o medidor mostra o cru (serve pra ajustar a sensibilidade), mas o anel
+      // so acende se eu estiver mesmo transmitindo
+      definirNivel(peerId, nivel, estado.vozStream?.getAudioTracks()[0]?.enabled === true);
+    } else {
+      definirNivel(peerId, estado.mudosLocais.has(peerId) || estado.vozSurdo ? 0 : nivel);
+    }
   });
   rafNivel = requestAnimationFrame(loopNivelVoz);
 }
@@ -1488,12 +1677,16 @@ function largarVoz() {
   [...vozPCs.keys()].forEach(encerrarConexaoVoz);
   pararLoopNivel();
   analisadoresVoz.clear();
+  desligarMonitor();
   if (estado.vozStream) {
     estado.vozStream.getTracks().forEach((t) => t.stop());
     estado.vozStream = null;
   }
   estado.vozMudo = false;
+  estado.vozSurdo = false;
+  estado.mudosLocais.clear();
   estado.voiceIds.clear();
+  portaoAberto = true;
 }
 
 btnMicrofone.addEventListener('click', alternarMicrofone);

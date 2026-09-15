@@ -3,7 +3,7 @@
 Arquivo vivo. O `CLAUDE.md` guarda as regras permanentes (e fica curto de propósito); **este
 guarda onde estamos**. Substitui o antigo `ESTADO-DO-PROJETO.md`, que ficou desatualizado.
 
-Última atualização: **15/09/2026** · Versão do app: **1.5.0**
+Última atualização: **15/09/2026** · Versão do app: **1.6.0**
 
 ---
 
@@ -74,9 +74,25 @@ candidato ICE entregue à conexão errada a mataria em silêncio.
 Anel no avatar de quem fala (`.falando`) e medidor do próprio microfone na folha de
 participantes, ambos alimentados por um `AnalyserNode` por stream.
 
-> **Sem "sair da voz" ainda.** Uma vez na conversa, você fica até sair da sala. Mudo resolve o
-> caso comum (tossir, atender alguém) e mantém você ouvindo; sair de vez não tem botão. Se
-> incomodar, é fácil de acrescentar.
+**Controles de voz** (1.6.0) — dois botões no rodapé, com papéis distintos: o **microfone**
+cala só você, e o **fone** silencia a conversa inteira (microfone e áudio). Voltar a ouvir
+devolve o microfone como estava antes, não mudo.
+
+Cada pessoa pode ser **silenciada individualmente**, só do seu lado: nada vai para o servidor
+e a pessoa não fica sabendo. Some quando você sai da sala.
+
+Ajustes do próprio microfone na folha de Ajustes: **sensibilidade** (portão de ruído — abaixo
+do limiar o microfone não transmite, com 400 ms de espera para não cortar o fim das frases),
+**cancelamento de eco** e **supressão de ruído**. Os dois últimos tentam `applyConstraints` e,
+se o navegador não aceitar num track já aberto, pegam outro microfone e fazem `replaceTrack`
+nos senders — as conexões não caem.
+
+> **O portão mede um clone.** Fechar o portão é `track.enabled = false`, e uma track desabilitada
+> entrega silêncio ao WebAudio — o medidor leria zero e o portão nunca mais reabriria. Por isso
+> o `AnalyserNode` do próprio microfone escuta um clone da track, que fica sempre habilitado.
+
+> **Sem "sair da voz" ainda.** Uma vez na conversa, você fica até sair da sala. Mudo e fone
+> cobrem o caso comum; sair de vez não tem botão. Se incomodar, é fácil de acrescentar.
 
 > **Eco com áudio de tela.** Quem compartilha tela **com som** e está na voz vai ter o
 > microfone captando esse som pelas caixas. O cancelamento de eco ajuda, mas não resolve com

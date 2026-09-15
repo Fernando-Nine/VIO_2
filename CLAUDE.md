@@ -91,7 +91,7 @@ com o mesmo conteúdo: `package.json`, `@CHANGELOG.md` e `@public/changelog.json
 app exibe quando se toca no número da versão) — **[HOOK]**: o commit falha se `version` mudar
 sem os outros dois. O app lê a versão de `/api/version`, servida a partir do `package.json`.
 
-Semver: correção = PATCH, feature nova = MINOR. Versão atual: 1.5.0.
+Semver: correção = PATCH, feature nova = MINOR. Versão atual: 1.6.0.
 
 ## Estrutura de pastas
 

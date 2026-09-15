@@ -7,6 +7,20 @@ segue [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAJOR.MINOR.PA
 O mesmo conteúdo fica disponível dentro do próprio app, tocando no número da versão na
 tela de entrada.
 
+## [1.6.0] - 2026-09-15
+
+### Adicionado
+- Botão de fone separado do microfone: dá pra calar só o seu microfone, ou
+  silenciar a conversa inteira — microfone e áudio de uma vez.
+- Silenciar uma pessoa específica, só pra você, direto na lista de
+  participantes. A pessoa não fica sabendo.
+- Ajustes do seu próprio microfone: sensibilidade, cancelamento de eco e
+  supressão de ruído, cada um configurando o seu.
+
+### Corrigido
+- Voltar a ouvir a conversa deixava o microfone mudo mesmo sem você ter pedido.
+  Agora ele volta como estava antes.
+
 ## [1.5.0] - 2026-09-15
 
 ### Adicionado

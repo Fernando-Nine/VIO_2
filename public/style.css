@@ -1821,3 +1821,47 @@ button:focus {
   vertical-align: -2px;
   opacity: 0.65;
 }
+
+/* Estado "cortado": risco diagonal sobre o ícone, pra dizer "desligado" sem
+   precisar de um SVG novo. Usado no fone e no silenciar de cada participante. */
+.cortado {
+  position: relative;
+  color: var(--texto-fantasma);
+}
+
+.cortado::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 60%;
+  height: 2px;
+  border-radius: 2px;
+  background-color: var(--perigo);
+  transform: translate(-50%, -50%) rotate(-45deg);
+  pointer-events: none;
+}
+
+/* Silenciar uma pessoa específica, na lista de participantes. */
+.btn-silenciar {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border: 1px solid transparent;
+  border-radius: var(--raio-full);
+  background: transparent;
+  color: var(--texto-fraco);
+  cursor: pointer;
+}
+
+.btn-silenciar:hover,
+.btn-silenciar:focus-visible {
+  color: var(--texto);
+  border-color: var(--borda-forte);
+}
+
+.btn-silenciar[aria-pressed="true"] {
+  color: var(--perigo);
+}

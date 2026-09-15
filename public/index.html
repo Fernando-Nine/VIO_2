@@ -176,6 +176,9 @@
       <button id="btn-microfone" type="button" class="btn-icone" aria-pressed="false" aria-label="Entrar na conversa por voz" title="Entrar na conversa por voz">
         <span id="icone-microfone" class="icone icone-microphone-slash" aria-hidden="true"></span>
       </button>
+      <button id="btn-fone" type="button" class="btn-icone oculto" aria-pressed="false" aria-label="Silenciar a conversa inteira" title="Silenciar a conversa inteira (microfone e áudio)">
+        <span id="icone-fone" class="icone icone-headphones" aria-hidden="true"></span>
+      </button>
       <button id="btn-compartilhar" type="button" class="btn-primario btn-compartilhar">
         <span class="icone icone-computer" aria-hidden="true"></span>
         Compartilhar tela
@@ -253,6 +256,36 @@
         <input id="chk-audio" type="checkbox" class="interruptor" checked />
         <span class="trilho-interruptor" aria-hidden="true"></span>
       </label>
+
+      <!-- Microfone: cada pessoa ajusta o seu -->
+      <div id="bloco-microfone" class="grupo-campo oculto">
+        <span class="rotulo-campo">Seu microfone</span>
+
+        <div class="rotulo-slider">
+          <label for="range-sensibilidade">Sensibilidade</label>
+          <b id="valor-sensibilidade">8</b>
+        </div>
+        <input id="range-sensibilidade" type="range" class="slider-marca" min="0" max="30" step="1" value="8" />
+        <p class="nota-avancado">Abaixo desse nível o microfone não transmite. Suba se o barulho de fundo estiver vazando; baixe se estiverem te perdendo quando fala baixo. Em 0 fica sempre aberto.</p>
+
+        <label class="linha-toggle" for="chk-eco">
+          <span class="texto-toggle">
+            <span class="titulo-toggle">Cancelamento de eco</span>
+            <span class="sub-toggle">Evita que o som das caixas volte pelo seu microfone</span>
+          </span>
+          <input id="chk-eco" type="checkbox" class="interruptor" checked />
+          <span class="trilho-interruptor" aria-hidden="true"></span>
+        </label>
+
+        <label class="linha-toggle" for="chk-ruido">
+          <span class="texto-toggle">
+            <span class="titulo-toggle">Supressão de ruído</span>
+            <span class="sub-toggle">Corta ventilador, teclado e barulho constante</span>
+          </span>
+          <input id="chk-ruido" type="checkbox" class="interruptor" checked />
+          <span class="trilho-interruptor" aria-hidden="true"></span>
+        </label>
+      </div>
 
       <!-- Grupo segmentado: qualidade -->
       <div class="grupo-campo">

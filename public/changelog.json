@@ -1,5 +1,15 @@
 [
   {
+    "versao": "1.6.0",
+    "data": "2026-09-15",
+    "mudancas": [
+      { "tipo": "adicionado", "texto": "Botão de fone separado do microfone: dá pra calar só o seu microfone, ou silenciar a conversa inteira — microfone e áudio de uma vez." },
+      { "tipo": "adicionado", "texto": "Silenciar uma pessoa específica, só pra você, direto na lista de participantes. A pessoa não fica sabendo." },
+      { "tipo": "adicionado", "texto": "Ajustes do seu próprio microfone: sensibilidade, cancelamento de eco e supressão de ruído, cada um configurando o seu." },
+      { "tipo": "corrigido", "texto": "Voltar a ouvir a conversa deixava o microfone mudo mesmo sem você ter pedido. Agora ele volta como estava antes." }
+    ]
+  },
+  {
     "versao": "1.5.0",
     "data": "2026-09-15",
     "mudancas": [
