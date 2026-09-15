@@ -13,9 +13,18 @@ O código que está na pasta é o mesmo do último `.zip` íntegro: tudo da seç
 e foi testado. Nada da seção 3 existe no código, por mais detalhada que tenha sido a conversa
 sobre cada item.
 
-Instância publicada: `https://vio-0ia0.onrender.com/` (Render, plano gratuito).
-Repositório canônico: **GitHub** — a pasta local em `Documents\Nerd_Quest\VIO` é uma cópia e
+O VIO 2 **não roda em lugar nenhum hoje**. O plano é localhost → `npm install` e `npm start`
+com um amigo via Radmin → só então hospedagem. O `render.yaml` fica como intenção; o
+`https://vio-0ia0.onrender.com/` no ar é o **VIO 1 legado**, que continua servindo os amigos e
+não deve ser confundido com este projeto.
+
+Repositório canônico: **GitHub** — `Fernando-Nine/VIO_2`, e desde 15/09/2026 ele de fato contém
+o projeto (antes tinha só o README). A pasta local em `Documents\Nerd_Quest\VIO` é uma cópia e
 **não** deve ser a pasta de trabalho. Clonar o repo e trabalhar dentro do clone.
+
+> **Aviso do Radmin:** dentro da VPN todo mundo fica na mesma rede virtual, então a travessia de
+> NAT não é exercitada. Um teste que passa pelo Radmin **não** prova que passa pela internet
+> aberta — é justamente o caso do amigo que não consegue ver a tela (ver seção 3, TURN).
 
 ## 2. O que existe e funciona
 
@@ -55,6 +64,10 @@ changelog dentro do app; AGPLv3.
 - **Câmera** — só a decisão de arquitetura (conexões separadas das de tela). Zero código.
 - **TURN** — discutido a fundo (relay de último recurso, credenciais efêmeras, ligar por
   variável de ambiente), nada implementado. Só STUN do Google hoje.
+  **Sintoma já confirmado na prática:** um amigo não consegue ver a tela de ninguém, enquanto a
+  maioria vê normal. É a assinatura de NAT simétrico — STUN não atravessa, só TURN. Continua na
+  posição 5 do roadmap por decisão, mas vale saber que para essa pessoa o VIO não funciona hoje,
+  e nenhuma das features 1 a 4 muda isso.
 - **Tauri + WASAPI** — 100% planejamento. Nenhum projeto Tauri criado.
 - **Segurança pendente** — Helmet.js, validação formal de payload do Socket.IO, log
   estruturado, hash de senha (se um dia existir conta).
@@ -88,7 +101,26 @@ changelog dentro do app; AGPLv3.
 
 ## 5. Redesenho visual via V0 — registro
 
-**Status: não iniciado.**
+**Status: integrado em 15/09/2026, aguardando teste manual.**
+
+**Rodada 1 — 15/09/2026.**
+- O V0 entregou **HTML e CSS puros**, sem React: não precisou portar nada à mão.
+- Trocados `public/index.html` e `public/style.css`. O `app.js` não foi tocado.
+- **Nenhum dos 59 ids do contrato faltou**, e as 30 classes que o JS liga, desliga ou cria
+  existem no CSS novo. Verificado com o snippet do `PROMPT-V0.md`: array vazio.
+- **Faltaram as duas tags de script** (`socket.io.js` e `app.js`): o export do V0 as perdeu, e
+  sem elas a tela abre bonita e completamente morta. Devolvidas na integração — é exatamente o
+  que o §5.2 do `REDESIGN-CONTRATO.md` manda conferir.
+- Ajustes manuais depois: favicon reposto (o export não trazia); o botão "Gerar" vinha com
+  `icone-settings` (engrenagem de ajustes) e passou a usar `icone-rotate-right`, que já existia.
+- **Ícones:** o export trazia um conjunto próprio, de contorno, que difere do Flaticon em
+  `public/icons/`. Mantido o conjunto atual — o `settings.svg` do V0 não é uma engrenagem, e o
+  `CLAUDE.md` proíbe mexer em `public/icons/` sem pedido. Só foram **acrescentados** os cinco
+  que não tinham equivalente: `clock`, `link`, `rocket`, `tela-cheia`, `voltar`.
+- Versão publicada com o redesenho: ainda nenhuma (roda só em localhost).
+
+**Pendente desta rodada:** a checklist de teste manual do `CLAUDE.md` (duas abas, PC + celular,
+reinício do servidor). Nada de WebRTC foi validado — o Claude Code não consegue testar isso.
 
 Plano: `PROMPT-V0.md` (três mensagens, no mesmo chat do V0) e `REDESIGN-CONTRATO.md` (os 57 ids,
 classes e atributos que o `app.js` consulta). O redesenho troca **apenas** `public/index.html` e

@@ -56,12 +56,17 @@ de fechar qualquer tarefa que toque em mídia:
 
 ## Fora de limite
 
+Regras **[HOOK]** são cumpridas por `@.claude/hooks/guard.js`, não por adesão a este texto.
+Texto aqui é pedido; hook é portão. Foi a falta deles que deixou um export inteiro do V0 entrar
+no repositório por um `git add .`.
+
+- **[HOOK]** Nunca adicionar dependência npm sem aprovação explícita.
+- **[HOOK]** Nunca commitar `.env`, credencial de TURN ou qualquer segredo.
+- **[HOOK]** Nunca dar push na `main` sem pedido explícito.
+- **[HOOK]** Nunca commitar arquivo de ferramenta visual (`components/`, `lib/`, `*.tsx`,
+  `pnpm-*.yaml`, `public/placeholder-*`).
 - Nunca rotear mídia pelo servidor. Se uma solução exige o servidor tocar no stream, ela está
   errada pro VIO (exceção futura: TURN, que é relay de rede, não de aplicação).
-- Nunca adicionar dependência npm sem aprovação explícita — **usar Hook** (bloquear
-  `npm install <pacote>` e edição de `dependencies` em `package.json`).
-- Nunca commitar `.env`, credencial de TURN ou qualquer segredo — **usar Hook**.
-- Nunca dar push na `main` sem pedido explícito — **usar Hook**.
 - Não reescrever a interface em React/Tailwind. Código gerado por V0, Bolt.new ou Abacus entra
   como referência visual, nunca colado no repositório.
 - Não mexer em `public/icons/` nem na paleta sem pedido.
@@ -70,19 +75,26 @@ de fechar qualquer tarefa que toque em mídia:
 
 Fonte da verdade: o campo `version` de `@package.json`. Toda release mexe em **três** arquivos
 com o mesmo conteúdo: `package.json`, `@CHANGELOG.md` e `@public/changelog.json` (é este que o
-app exibe quando se toca no número da versão) — **usar Hook** (falhar se `version` mudar sem os
-outros dois).
+app exibe quando se toca no número da versão) — **[HOOK]**: o commit falha se `version` mudar
+sem os outros dois. O app lê a versão de `/api/version`, servida a partir do `package.json`.
 
 Semver: correção = PATCH, feature nova = MINOR. Versão atual: 1.2.0.
 
 ## Estrutura de pastas
+
+Arquivo fora desta árvore é contaminação de ferramenta externa e sai antes do commit.
 
 ```
 vio/
   server.js            sinalização + rate limit + arquivos estáticos
   package.json         version = fonte da verdade
   CHANGELOG.md
-  render.yaml          blueprint do Render (auto-deploy por commit)
+  ESTADO.md            onde estamos (arquivo vivo)
+  REDESIGN-CONTRATO.md contrato de DOM · PROMPT-V0.md
+  render.yaml          blueprint do Render (hospedagem ainda não decidida)
+  .claude/
+    settings.json      liga o hook
+    hooks/guard.js     as regras [HOOK]
   public/
     index.html
     app.js             cliente inteiro

@@ -1,15 +1,22 @@
-# v0 sandbox internal files
-__v0_runtime_loader.js
-__v0_devtools.tsx
-__v0_jsx-dev-runtime.ts
-.snowflake/
+# Dependencias
+node_modules/
+
+# Segredos e ambiente (credencial de TURN entra aqui quando existir)
+.env
+.env.*
+!.env.example
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Sobras de ferramenta visual (V0, Bolt, etc.) — o redesenho entra como
+# referencia, nunca como export colado no repositorio. Ver CLAUDE.md.
+components/
+lib/
+pnpm-lock.yaml
+pnpm-workspace.yaml
+.next/
 .v0-trash/
 .vercel/
-
-# Environment variables
-.env*.local
-
-# Common ignores
-node_modules
-.next/
-.DS_Store
+public/placeholder-*
