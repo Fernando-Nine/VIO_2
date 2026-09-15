@@ -78,6 +78,11 @@ const iconeFone = document.getElementById('icone-fone');
 const blocoMicrofone = document.getElementById('bloco-microfone');
 const rangeSensibilidade = document.getElementById('range-sensibilidade');
 const valorSensibilidade = document.getElementById('valor-sensibilidade');
+const rangeGanho = document.getElementById('range-ganho');
+const valorGanho = document.getElementById('valor-ganho');
+const selectEntrada = document.getElementById('select-entrada');
+const selectSaida = document.getElementById('select-saida');
+const linhaSaida = document.getElementById('linha-saida');
 const chkEco = document.getElementById('chk-eco');
 const chkRuido = document.getElementById('chk-ruido');
 const btnCompartilhar = document.getElementById('btn-compartilhar');
@@ -142,9 +147,13 @@ const estado = {
   vozMudo: false, // mudo local: a conexao continua, a track e que para de mandar
   vozSurdo: false, // "fone desligado": nao ouco ninguem E nao mando nada
   mudosLocais: new Set(), // pessoas que EU silenciei — so pra mim, ninguem sabe
+  micBruto: null, // o que sai do getUserMedia, antes do grafo de audio
   micEco: true, // cancelamento de eco
   micRuido: true, // supressao de ruido
+  micGanho: 1, // multiplicador do volume do microfone (0.2 a 3)
   micSensibilidade: 8, // portao: abaixo desse nivel o microfone nao transmite (0 = sempre aberto)
+  micEntradaId: '', // deviceId do microfone escolhido ('' = padrao do sistema)
+  saidaId: '', // deviceId da saida de audio ('' = padrao do sistema)
 };
 
 const outgoingPCs = new Map(); // peerId -> RTCPeerConnection (uso pra cada pessoa que assiste MEU compartilhamento)
@@ -583,7 +592,7 @@ socket.on('room-state', ({ participants, sharingIds, voiceIds, criadaEm }) => {
     // Mesma logica pro microfone: ele sobrevive a queda, so as conexoes morrem.
     // O medidor precisa ser religado porque era indexado pelo socket.id antigo.
     if (estado.vozStream) {
-      monitorarNivel(socket.id, estado.vozStream);
+      reancorarAnalisadorLocal();
       socket.emit('start-voice');
     }
   }
@@ -1367,17 +1376,103 @@ async function tratarSinalVoz(from, payload) {
 }
 
 // ---- microfone ----
+//
+// O audio do microfone passa por um grafo WebAudio antes de ir pra rede:
+//
+//   getUserMedia (micBruto)
+//        v
+//   MediaStreamSource ---> ganhoUsuario ---> analisador ---> ganhoPortao ---> destino
+//                                                v                              v
+//                                     medidor e portao leem aqui        estado.vozStream
+//                                                                    (o que vai pras PCs)
+//
+// O grafo e montado UMA vez. Trocar de microfone ou mexer em eco/ruido so troca
+// o no de fonte — o destino continua o mesmo, entao estado.vozStream nao muda e
+// as PeerConnections nem ficam sabendo: sem replaceTrack, sem renegociacao.
+//
+// O analisador fica ANTES do portao de proposito: assim ele mede o sinal real
+// mesmo com o portao fechado, e o portao consegue reabrir. (Antes isso exigia
+// medir um clone da track, porque o portao fechava com enabled=false.)
 
-async function ligarMicrofone() {
-  if (estado.vozStream) return true;
-  try {
-    estado.vozStream = await navigator.mediaDevices.getUserMedia({
-      // LIGADOS de proposito — o oposto do audio de tela. Aqui e voz de
-      // microfone, exatamente o caso pra que esses processamentos existem.
-      audio: { echoCancellation: estado.micEco, noiseSuppression: estado.micRuido, autoGainControl: true },
-      video: false,
+let noFonte = null;
+let noGanho = null;
+let noAnalisador = null;
+let noPortao = null;
+let noDestino = null;
+
+function montarGrafoMicrofone(streamBruto) {
+  const ctx = obterAudioCtxUI();
+  if (!ctx) {
+    // Sem WebAudio: manda o microfone cru. Perde ganho e portao, mas fala.
+    estado.vozStream = streamBruto;
+    return;
+  }
+
+  if (!noDestino) {
+    noGanho = ctx.createGain();
+    noGanho.gain.value = estado.micGanho;
+
+    noAnalisador = ctx.createAnalyser();
+    noAnalisador.fftSize = 512;
+    noAnalisador.smoothingTimeConstant = 0.6;
+
+    noPortao = ctx.createGain();
+    noPortao.gain.value = 1;
+
+    noDestino = ctx.createMediaStreamDestination();
+
+    noGanho.connect(noAnalisador);
+    noAnalisador.connect(noPortao);
+    noPortao.connect(noDestino);
+
+    estado.vozStream = noDestino.stream;
+    analisadoresVoz.set(socket.id, {
+      analisador: noAnalisador,
+      dados: new Uint8Array(noAnalisador.fftSize),
     });
-    ligarMonitor(estado.vozStream);
+  }
+
+  if (noFonte) noFonte.disconnect();
+  noFonte = ctx.createMediaStreamSource(streamBruto);
+  noFonte.connect(noGanho);
+}
+
+// O analisador do grafo e indexado pelo meu socket.id, que muda na reconexao.
+// Sem reancorar, o medidor e o portao ficariam olhando pra uma chave morta.
+function reancorarAnalisadorLocal() {
+  if (!noAnalisador) return;
+  analisadoresVoz.set(socket.id, {
+    analisador: noAnalisador,
+    dados: new Uint8Array(noAnalisador.fftSize),
+  });
+}
+
+function desmontarGrafoMicrofone() {
+  [noFonte, noGanho, noAnalisador, noPortao].forEach((no) => { if (no) no.disconnect(); });
+  noFonte = noGanho = noAnalisador = noPortao = noDestino = null;
+}
+
+function restricoesDoMicrofone() {
+  // LIGADOS de proposito — o oposto do audio de tela. Aqui e voz de microfone,
+  // exatamente o caso pra que esses processamentos existem.
+  const r = {
+    echoCancellation: estado.micEco,
+    noiseSuppression: estado.micRuido,
+    autoGainControl: true,
+  };
+  if (estado.micEntradaId) r.deviceId = { exact: estado.micEntradaId };
+  return r;
+}
+
+async function abrirMicrofone() {
+  const anterior = estado.micBruto;
+  try {
+    const bruto = await navigator.mediaDevices.getUserMedia({ audio: restricoesDoMicrofone(), video: false });
+    estado.micBruto = bruto;
+    montarGrafoMicrofone(bruto);
+    if (anterior) anterior.getTracks().forEach((t) => t.stop());
+    aplicarEstadoMicrofone();
+    listarDispositivos(); // so agora os rotulos vem preenchidos
     return true;
   } catch (erro) {
     if (erro.name === 'NotAllowedError') {
@@ -1390,40 +1485,32 @@ async function ligarMicrofone() {
 }
 
 async function entrarNaVoz() {
-  if (!(await ligarMicrofone())) return;
+  if (!(await abrirMicrofone())) return;
   estado.vozMudo = false;
   estado.vozSurdo = false;
   aplicarEstadoMicrofone();
   socket.emit('start-voice');
 }
 
-// Estado final da minha track de audio. Tres coisas podem fechar o microfone, e
-// a ordem importa: mudo e surdez sao decisao do usuario e ganham do portao.
+// Mudo e surdez sao decisao do usuario e cortam a track de vez; o portao e
+// automatico e mexe so no ganho, com rampa, pra nao estalar.
 let portaoAberto = true;
-
-// O portao fecha a track com enabled=false — e uma track desabilitada entrega
-// silencio pro WebAudio, o que faria o medidor ler zero e o portao nunca mais
-// reabrir. Por isso medimos um CLONE, que fica sempre habilitado.
-let trackMonitor = null;
-
-function ligarMonitor(stream) {
-  desligarMonitor();
-  const original = stream.getAudioTracks()[0];
-  if (!original) return;
-  trackMonitor = original.clone();
-  analisadoresVoz.delete(socket.id);
-  monitorarNivel(socket.id, new MediaStream([trackMonitor]));
-}
-
-function desligarMonitor() {
-  if (trackMonitor) trackMonitor.stop();
-  trackMonitor = null;
-}
 
 function aplicarEstadoMicrofone() {
   if (!estado.vozStream) return;
-  const transmitir = !estado.vozMudo && !estado.vozSurdo && portaoAberto;
+  const transmitir = !estado.vozMudo && !estado.vozSurdo;
   estado.vozStream.getAudioTracks().forEach((t) => { t.enabled = transmitir; });
+}
+
+function aplicarPortao(aberto) {
+  if (!noPortao) return;
+  const ctx = obterAudioCtxUI();
+  if (!ctx) return;
+  const agora = ctx.currentTime;
+  noPortao.gain.cancelScheduledValues(agora);
+  noPortao.gain.setValueAtTime(noPortao.gain.value, agora);
+  // abre rapido pra nao comer o comeco da palavra, fecha devagar pra nao estalar
+  noPortao.gain.linearRampToValueAtTime(aberto ? 1 : 0, agora + (aberto ? 0.02 : 0.15));
 }
 
 // Silencia o que CHEGA: a surdez cala todo mundo, e mudosLocais cala so quem eu
@@ -1501,41 +1588,91 @@ function atualizarBotaoMicrofone() {
 // ---- ajustes do proprio microfone ----
 
 async function aplicarAjustesMicrofone() {
-  if (!estado.vozStream) return;
-  const track = estado.vozStream.getAudioTracks()[0];
+  if (!estado.micBruto) return;
+  const track = estado.micBruto.getAudioTracks()[0];
   if (!track) return;
-
-  const restricoes = { echoCancellation: estado.micEco, noiseSuppression: estado.micRuido };
   try {
-    await track.applyConstraints(restricoes);
+    await track.applyConstraints({ echoCancellation: estado.micEco, noiseSuppression: estado.micRuido });
   } catch {
-    // Nem todo navegador troca eco/ruido num track ja aberto. Nesse caso pega um
-    // microfone novo e substitui nos senders — as conexoes continuam de pe.
-    await trocarTrackDeMicrofone(restricoes);
+    // Navegador que nao troca isso num track ja aberto: pega um microfone novo.
+    // So o no de fonte muda, entao as conexoes nem ficam sabendo.
+    await abrirMicrofone();
   }
 }
 
-async function trocarTrackDeMicrofone(restricoes) {
+// ---- dispositivos de entrada e saida ----
+
+// setSinkId (escolher a saida de audio) so existe no Chrome e derivados. Onde
+// nao existe, o seletor de saida some em vez de fingir que funciona.
+const suportaEscolherSaida = typeof HTMLMediaElement !== 'undefined'
+  && typeof HTMLMediaElement.prototype.setSinkId === 'function';
+
+function preencherSelect(elemento, dispositivos, escolhido, rotuloPadrao) {
+  elemento.innerHTML = '';
+  const padrao = document.createElement('option');
+  padrao.value = '';
+  padrao.textContent = rotuloPadrao;
+  elemento.appendChild(padrao);
+
+  dispositivos.forEach((d, i) => {
+    const op = document.createElement('option');
+    op.value = d.deviceId;
+    // Antes de liberar o microfone o navegador esconde os nomes; depois vem tudo.
+    op.textContent = d.label || `Dispositivo ${i + 1}`;
+    elemento.appendChild(op);
+  });
+
+  elemento.value = dispositivos.some((d) => d.deviceId === escolhido) ? escolhido : '';
+}
+
+async function listarDispositivos() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+  let lista = [];
   try {
-    const novo = await navigator.mediaDevices.getUserMedia({
-      audio: { ...restricoes, autoGainControl: true },
-      video: false,
-    });
-    const trackNovo = novo.getAudioTracks()[0];
+    lista = await navigator.mediaDevices.enumerateDevices();
+  } catch {
+    return;
+  }
 
-    await Promise.all([...vozPCs.values()].map((pc) => {
-      const sender = pc.getSenders().find((s) => s.track && s.track.kind === 'audio');
-      return sender ? sender.replaceTrack(trackNovo) : Promise.resolve();
-    }));
+  preencherSelect(selectEntrada, lista.filter((d) => d.kind === 'audioinput'), estado.micEntradaId, 'Microfone padrão');
 
-    estado.vozStream.getTracks().forEach((t) => t.stop());
-    estado.vozStream = novo;
-    ligarMonitor(novo);
-    aplicarEstadoMicrofone();
+  const saidas = lista.filter((d) => d.kind === 'audiooutput');
+  preencherSelect(selectSaida, saidas, estado.saidaId, 'Saída padrão');
+  linhaSaida.classList.toggle('oculto', !suportaEscolherSaida || saidas.length === 0);
+}
+
+async function aplicarSaidaEm(elemento) {
+  if (!suportaEscolherSaida || !estado.saidaId) return;
+  try {
+    await elemento.setSinkId(estado.saidaId);
   } catch (erro) {
-    mostrarAlerta('Não consegui aplicar esse ajuste do microfone: ' + erro.message, 5000);
+    console.warn('[VIO] nao deu pra trocar a saida de audio:', erro.message);
   }
 }
+
+async function aplicarSaidaEmTodos() {
+  for (const el of [...audiosVoz.values(), videoRemoto]) await aplicarSaidaEm(el);
+}
+
+if (navigator.mediaDevices && 'ondevicechange' in navigator.mediaDevices) {
+  navigator.mediaDevices.addEventListener('devicechange', listarDispositivos);
+}
+
+selectEntrada.addEventListener('change', async () => {
+  estado.micEntradaId = selectEntrada.value;
+  if (estado.micBruto) await abrirMicrofone();
+});
+
+selectSaida.addEventListener('change', async () => {
+  estado.saidaId = selectSaida.value;
+  await aplicarSaidaEmTodos();
+});
+
+rangeGanho.addEventListener('input', () => {
+  estado.micGanho = Number(rangeGanho.value) / 100;
+  if (noGanho) noGanho.gain.value = estado.micGanho;
+  valorGanho.textContent = `${rangeGanho.value}%`;
+});
 
 function alternarMudoDe(peerId) {
   if (estado.mudosLocais.has(peerId)) estado.mudosLocais.delete(peerId);
@@ -1578,6 +1715,7 @@ function reproduzirVoz(peerId, stream) {
     el.dataset.peer = peerId;
     audiosVoz.set(peerId, el);
     document.body.appendChild(el);
+    aplicarSaidaEm(el); // respeita a saida de audio escolhida
   }
   if (el.srcObject !== stream) el.srcObject = stream;
   el.muted = estado.vozSurdo || estado.mudosLocais.has(peerId);
@@ -1636,7 +1774,7 @@ function avaliarPortao(nivelCru) {
       fechaPortaoEm = 0;
     }
   }
-  aplicarEstadoMicrofone();
+  aplicarPortao(portaoAberto);
 }
 
 function loopNivelVoz() {
@@ -1651,10 +1789,12 @@ function loopNivelVoz() {
     const nivel = Math.min(100, Math.round(rms * 400));
 
     if (peerId === socket.id) {
-      avaliarPortao(nivel); // o meu nivel vem do clone, entao e sempre o cru
-      // o medidor mostra o cru (serve pra ajustar a sensibilidade), mas o anel
-      // so acende se eu estiver mesmo transmitindo
-      definirNivel(peerId, nivel, estado.vozStream?.getAudioTracks()[0]?.enabled === true);
+      // o analisador fica ANTES do portao, entao aqui o nivel e sempre o real
+      avaliarPortao(nivel);
+      // o medidor mostra esse nivel (serve pra ajustar ganho e sensibilidade),
+      // mas o anel so acende quando eu estou de fato mandando alguma coisa
+      const mandando = !estado.vozMudo && !estado.vozSurdo && portaoAberto;
+      definirNivel(peerId, nivel, mandando);
     } else {
       definirNivel(peerId, estado.mudosLocais.has(peerId) || estado.vozSurdo ? 0 : nivel);
     }
@@ -1677,11 +1817,12 @@ function largarVoz() {
   [...vozPCs.keys()].forEach(encerrarConexaoVoz);
   pararLoopNivel();
   analisadoresVoz.clear();
-  desligarMonitor();
-  if (estado.vozStream) {
-    estado.vozStream.getTracks().forEach((t) => t.stop());
-    estado.vozStream = null;
+  desmontarGrafoMicrofone();
+  if (estado.micBruto) {
+    estado.micBruto.getTracks().forEach((t) => t.stop());
+    estado.micBruto = null;
   }
+  estado.vozStream = null;
   estado.vozMudo = false;
   estado.vozSurdo = false;
   estado.mudosLocais.clear();

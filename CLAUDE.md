@@ -36,6 +36,11 @@ Decisão explícita de escopo, não limitação temporária:
   separa tela de voz. Câmera, quando existir, segue o mesmo padrão.
 - Na malha de voz, **quem tem o `socket.id` menor faz a oferta**; o outro espera. Sem isso as
   duas pontas travam em `have-local-offer`.
+- **Grafo de áudio do microfone:** `fonte → ganhoUsuario → analisador → ganhoPortão → destino`,
+  montado uma vez. Trocar de microfone ou de restrição só troca o nó de **fonte** — o destino
+  não muda, então `estado.vozStream` é estável e as PeerConnections não são renegociadas. O
+  analisador fica **antes** do portão, senão o portão fechado zeraria o medidor e nunca
+  reabriria. `track.enabled` é só mudo/surdez; o portão corta por ganho, com rampa.
 
 ## Stack e convenções
 
@@ -91,7 +96,7 @@ com o mesmo conteúdo: `package.json`, `@CHANGELOG.md` e `@public/changelog.json
 app exibe quando se toca no número da versão) — **[HOOK]**: o commit falha se `version` mudar
 sem os outros dois. O app lê a versão de `/api/version`, servida a partir do `package.json`.
 
-Semver: correção = PATCH, feature nova = MINOR. Versão atual: 1.6.0.
+Semver: correção = PATCH, feature nova = MINOR. Versão atual: 1.7.0.
 
 ## Estrutura de pastas
 

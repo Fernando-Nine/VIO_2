@@ -7,6 +7,20 @@ segue [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAJOR.MINOR.PA
 O mesmo conteúdo fica disponível dentro do próprio app, tocando no número da versão na
 tela de entrada.
 
+## [1.7.0] - 2026-09-15
+
+### Adicionado
+- Dá pra escolher qual microfone usar e, no Chrome e derivados, por onde o som
+  sai — fone, caixa ou monitor.
+- Controle de ganho do microfone: se estiverem te ouvindo baixo, agora dá pra
+  levantar sem mexer no sistema.
+
+### Alterado
+- O corte da sensibilidade ficou suave. Antes o microfone era desligado de vez
+  quando você parava de falar, o que cortava seco; agora o volume desce em rampa.
+- Trocar de microfone ou mexer em eco e ruído não derruba mais a conversa — a
+  conexão continua de pé enquanto o ajuste acontece.
+
 ## [1.6.0] - 2026-09-15
 
 ### Adicionado

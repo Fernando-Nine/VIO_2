@@ -261,6 +261,22 @@
       <div id="bloco-microfone" class="grupo-campo oculto">
         <span class="rotulo-campo">Seu microfone</span>
 
+        <div class="linha-select">
+          <label for="select-entrada">Entrada</label>
+          <select id="select-entrada" class="select-campo"></select>
+        </div>
+
+        <div id="linha-saida" class="linha-select">
+          <label for="select-saida">Saída</label>
+          <select id="select-saida" class="select-campo"></select>
+        </div>
+
+        <div class="rotulo-slider">
+          <label for="range-ganho">Ganho</label>
+          <b id="valor-ganho">100%</b>
+        </div>
+        <input id="range-ganho" type="range" class="slider-marca" min="20" max="300" step="5" value="100" />
+
         <div class="rotulo-slider">
           <label for="range-sensibilidade">Sensibilidade</label>
           <b id="valor-sensibilidade">8</b>

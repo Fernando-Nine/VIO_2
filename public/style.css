@@ -1865,3 +1865,37 @@ button:focus {
 .btn-silenciar[aria-pressed="true"] {
   color: var(--perigo);
 }
+
+/* Seletor de dispositivo (entrada e saída de áudio). */
+.linha-select {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.linha-select > label {
+  flex: none;
+  min-width: 56px;
+  font-size: 13px;
+  color: var(--texto-fraco);
+}
+
+.select-campo {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-sm);
+  background-color: var(--superficie-fraca);
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.select-campo:focus-visible {
+  border-color: var(--borda-marca);
+  outline: none;
+}

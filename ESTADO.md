@@ -3,7 +3,7 @@
 Arquivo vivo. O `CLAUDE.md` guarda as regras permanentes (e fica curto de propósito); **este
 guarda onde estamos**. Substitui o antigo `ESTADO-DO-PROJETO.md`, que ficou desatualizado.
 
-Última atualização: **15/09/2026** · Versão do app: **1.6.0**
+Última atualização: **15/09/2026** · Versão do app: **1.7.0**
 
 ---
 
@@ -81,15 +81,38 @@ devolve o microfone como estava antes, não mudo.
 Cada pessoa pode ser **silenciada individualmente**, só do seu lado: nada vai para o servidor
 e a pessoa não fica sabendo. Some quando você sai da sala.
 
-Ajustes do próprio microfone na folha de Ajustes: **sensibilidade** (portão de ruído — abaixo
-do limiar o microfone não transmite, com 400 ms de espera para não cortar o fim das frases),
-**cancelamento de eco** e **supressão de ruído**. Os dois últimos tentam `applyConstraints` e,
-se o navegador não aceitar num track já aberto, pegam outro microfone e fazem `replaceTrack`
-nos senders — as conexões não caem.
+Ajustes do próprio microfone na folha de Ajustes: **sensibilidade** (portão de ruído),
+**cancelamento de eco** e **supressão de ruído**.
 
-> **O portão mede um clone.** Fechar o portão é `track.enabled = false`, e uma track desabilitada
-> entrega silêncio ao WebAudio — o medidor leria zero e o portão nunca mais reabriria. Por isso
-> o `AnalyserNode` do próprio microfone escuta um clone da track, que fica sempre habilitado.
+**Grafo de áudio do microfone** (1.7.0) — o microfone não vai direto pra rede; passa por um
+grafo WebAudio montado **uma vez**:
+
+```
+getUserMedia → MediaStreamSource → ganhoUsuario → analisador → ganhoPortão → destino
+                                                       ↑                        ↓
+                                          medidor e portão leem aqui      estado.vozStream
+```
+
+Três consequências que valem lembrar:
+
+- **Trocar de microfone, ou mexer em eco/ruído, só troca o nó de fonte.** O destino continua o
+  mesmo, então `estado.vozStream` não muda e as PeerConnections nem ficam sabendo — sem
+  `replaceTrack`, sem renegociação.
+- **O portão corta por ganho, com rampa** (20 ms para abrir, 150 ms para fechar), não mais
+  desligando a track. Acabou o corte seco no fim das frases.
+- **O analisador fica antes do portão.** Antes isso exigia medir um *clone* da track, porque o
+  portão fechava com `enabled = false` e uma track desabilitada entrega silêncio ao WebAudio —
+  o medidor leria zero e o portão nunca mais reabriria. Com o grafo, o clone deixou de existir.
+
+`track.enabled` agora reflete só mudo e surdez, que são decisão do usuário.
+
+**Dispositivos** (1.7.0) — seletor de entrada e de saída na folha de Ajustes, mais um slider de
+ganho (20% a 300%). Os rótulos dos dispositivos só aparecem depois que o microfone é liberado,
+então a lista é preenchida após o `getUserMedia` e atualizada no evento `devicechange`.
+
+> **Escolher a saída só existe no Chrome e derivados.** `setSinkId` não existe no Firefox nem no
+> Safari; nesses navegadores o seletor de saída some em vez de fingir que funciona. A entrada
+> funciona em todos.
 
 > **Sem "sair da voz" ainda.** Uma vez na conversa, você fica até sair da sala. Mudo e fone
 > cobrem o caso comum; sair de vez não tem botão. Se incomodar, é fácil de acrescentar.
