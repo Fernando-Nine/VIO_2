@@ -86,7 +86,7 @@ npm start
 
 Abre em `http://localhost:3000`. Pra deixar acessível pra fora da sua rede, qualquer
 serviço de túnel (Cloudflare Tunnel, por exemplo) ou provedor de hospedagem que rode
-Node.js server-se — o `server.js` não tem nada específico de nenhum provedor.
+Node.js serve — o `server.js` não tem nada específico de nenhum provedor.
 
 ## Contribuindo
 
