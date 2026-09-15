@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>VIO</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%BA%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+  <!-- ===================== TELA DE ENTRADA ===================== -->
+  <section id="tela-entrada" class="tela tela-entrada">
+    <div class="cartao-entrada">
+      <div class="marca">
+        <span class="marca-icone" aria-hidden="true">V</span>
+        <h1>VIO</h1>
+      </div>
+      <p class="subtitulo">Compartilhe sua tela com os amigos, direto do navegador.</p>
+
+      <form id="form-entrar" class="form-entrar">
+        <label class="campo">
+          <span><span class="icone icone-user" aria-hidden="true"></span>Seu nome</span>
+          <input type="text" id="input-nome" maxlength="40" placeholder="Como te chamam?" required autocomplete="off" />
+        </label>
+
+        <label class="campo">
+          <span><span class="icone icone-key" aria-hidden="true"></span>Código da sala</span>
+          <div class="campo-com-botao">
+            <input type="text" id="input-sala" maxlength="12" placeholder="Ex: PIPOCA42" required autocomplete="off" />
+            <button type="button" id="btn-gerar-sala" title="Gerar um código novo">Gerar</button>
+          </div>
+        </label>
+
+        <button type="submit" class="botao botao-primario botao-grande">
+          <span class="icone icone-rocket" aria-hidden="true"></span>Entrar na sala
+        </button>
+      </form>
+      <p class="dica-entrada">Combine o mesmo código com seus amigos — a sala nasce sozinha quando o primeiro alguém entra nela. Mais de uma pessoa pode compartilhar tela ao mesmo tempo.</p>
+
+      <button type="button" class="credito" id="btn-versao">
+        v<span id="texto-versao">…</span> · by <strong>NerdQuest Studios</strong> · fundado por Nine
+      </button>
+    </div>
+  </section>
+
+  <!-- ===================== TELA DA SALA ===================== -->
+  <section id="tela-sala" class="tela tela-sala oculto">
+
+    <header class="cabecalho">
+      <button id="btn-sair-sala" class="botao-icone" title="Sair da sala" aria-label="Sair da sala">
+        <span class="icone icone-voltar" aria-hidden="true"></span>
+      </button>
+
+      <button id="btn-info-sala" class="pilula-sala" aria-haspopup="dialog">
+        <span class="ponto-status" id="ponto-ping" aria-hidden="true"></span>
+        <span id="texto-codigo-sala">—</span>
+      </button>
+
+      <button id="btn-participantes" class="botao-icone botao-participantes" aria-haspopup="dialog">
+        <span class="icone icone-user" aria-hidden="true"></span>
+        <span class="contador-badge" id="contador-participantes">1</span>
+      </button>
+    </header>
+
+    <main class="palco">
+      <div class="moldura-video" id="moldura-video">
+        <video id="video-remoto" autoplay playsinline></video>
+
+        <div class="overlay-placeholder" id="overlay-placeholder">
+          <span class="icone icone-computer" aria-hidden="true"></span>
+          <p id="texto-placeholder">Ninguém está compartilhando a tela ainda.</p>
+          <p class="overlay-dica" id="dica-placeholder">Toque em "Compartilhar tela" quando quiser começar.</p>
+        </div>
+
+        <div class="barra-topo oculto" id="barra-topo">
+          <div class="selo-ao-vivo oculto" id="selo-ao-vivo"><span class="ponto-pulsante"></span>AO VIVO</div>
+        </div>
+
+        <div class="tira-transmissoes oculto" id="tira-transmissoes"></div>
+
+        <button id="btn-desbloquear-audio" class="botao botao-primario botao-flutuante oculto">Ativar o som</button>
+
+        <div class="barra-video oculto" id="barra-video">
+          <div class="controle-volume oculto" id="controle-volume">
+            <button id="btn-mutar-local" class="botao-controle-video" title="Mutar ou ativar o som">
+              <span class="icone icone-volume" id="icone-volume" aria-hidden="true"></span>
+            </button>
+            <input type="range" id="range-volume" class="slider-video" min="0" max="100" value="100" title="Volume" />
+          </div>
+
+          <button id="btn-alternar-previa" class="botao-controle-video oculto" title="Ocultar sua prévia">
+            <span class="icone icone-eye" id="icone-previa" aria-hidden="true"></span>
+          </button>
+
+          <div class="espacador-video"></div>
+
+          <button id="btn-tela-cheia" class="botao-controle-video" title="Tela cheia">⛶</button>
+        </div>
+      </div>
+    </main>
+
+    <footer class="rodape">
+      <button id="btn-ajustes" class="botao-icone" title="Ajustes" aria-haspopup="dialog">
+        <span class="icone icone-settings" aria-hidden="true"></span>
+      </button>
+
+      <button id="btn-compartilhar" class="botao botao-primario">
+        <span class="icone icone-computer" aria-hidden="true"></span>Compartilhar tela
+      </button>
+    </footer>
+
+    <!-- ===== folhas (bottom sheets no celular, painéis ancorados no desktop) ===== -->
+
+    <div class="folha" id="folha-info-sala" role="dialog" aria-label="Sobre a sala">
+      <div class="alca-folha"></div>
+      <div class="cabecalho-folha">
+        <h2>Sobre a sala</h2>
+        <button class="botao-icone" id="btn-fechar-info-sala" aria-label="Fechar"><span class="icone icone-cross" aria-hidden="true"></span></button>
+      </div>
+
+      <div class="linha-folha">
+        <span class="rotulo-linha"><span class="icone icone-key" aria-hidden="true"></span><span class="titulo-linha">Código</span></span>
+        <span class="valor-linha" id="texto-codigo-completo">—</span>
+      </div>
+      <div class="linha-folha">
+        <span class="rotulo-linha"><span class="icone icone-clock" aria-hidden="true"></span><span class="titulo-linha">No ar há</span></span>
+        <span class="valor-linha" id="texto-duracao-sala">00:00</span>
+      </div>
+      <div class="linha-folha">
+        <span class="rotulo-linha"><span class="icone icone-wifi" aria-hidden="true"></span><span class="titulo-linha">Ping</span></span>
+        <span class="valor-linha" id="texto-ping-completo">Medindo…</span>
+      </div>
+
+      <button id="btn-copiar-link" class="botao botao-primario botao-grande acao-folha">
+        <span class="icone icone-user-add" aria-hidden="true"></span>Copiar link de convite
+      </button>
+    </div>
+
+    <aside class="folha" id="painel-participantes" role="dialog" aria-label="Quem está na sala">
+      <div class="alca-folha"></div>
+      <div class="cabecalho-folha">
+        <h2>Quem está na sala</h2>
+        <button class="botao-icone" id="btn-fechar-participantes" aria-label="Fechar"><span class="icone icone-cross" aria-hidden="true"></span></button>
+      </div>
+      <ul id="lista-participantes" class="lista-participantes"></ul>
+    </aside>
+
+    <div class="folha" id="painel-avancado" role="dialog" aria-label="Ajustes">
+      <div class="alca-folha"></div>
+      <div class="cabecalho-folha">
+        <h2>Ajustes</h2>
+        <button class="botao-icone" id="btn-fechar-avancado" aria-label="Fechar"><span class="icone icone-cross" aria-hidden="true"></span></button>
+      </div>
+
+      <label class="linha-folha" id="rotulo-chk-audio" for="chk-audio">
+        <span class="rotulo-linha"><span class="titulo-linha">Som da tela</span></span>
+        <span class="interruptor">
+          <input type="checkbox" id="chk-audio" checked />
+          <span class="trilho-interruptor" aria-hidden="true"></span>
+        </span>
+      </label>
+
+      <div>
+        <span class="titulo-linha">Qualidade</span>
+        <div class="segmentado" id="segmentado-qualidade" role="group" aria-label="Predefinições de qualidade">
+          <button type="button" data-valor="alta">Alta</button>
+          <button type="button" data-valor="media" class="ativo">Média</button>
+          <button type="button" data-valor="baixa">Baixa</button>
+        </div>
+      </div>
+
+      <div class="grupo-sliders">
+        <label class="campo-slider">
+          <span>Quadros por segundo (FPS)<b id="valor-fps">24</b></span>
+          <input type="range" id="range-fps" min="5" max="60" step="1" value="24" />
+        </label>
+        <label class="campo-slider">
+          <span>Bitrate máximo<b id="valor-bitrate">2.5 Mbps</b></span>
+          <input type="range" id="range-bitrate" min="0.3" max="8" step="0.1" value="2.5" />
+        </label>
+        <label class="campo-slider">
+          <span>Resolução enviada<b id="valor-escala">100%</b></span>
+          <input type="range" id="range-escala" min="30" max="100" step="5" value="100" />
+        </label>
+      </div>
+
+      <p class="nota-avancado" id="nota-surface"></p>
+    </div>
+
+    <div class="alerta oculto" id="alerta"></div>
+  </section>
+
+  <!-- compartilhada pelas duas telas: cobertura + folha de changelog -->
+  <div class="cobertura oculto" id="cobertura"></div>
+
+  <div class="folha" id="folha-changelog" role="dialog" aria-label="O que mudou">
+    <div class="alca-folha"></div>
+    <div class="cabecalho-folha">
+      <h2>O que mudou</h2>
+      <button class="botao-icone" id="btn-fechar-changelog" aria-label="Fechar"><span class="icone icone-cross" aria-hidden="true"></span></button>
+    </div>
+    <div id="lista-changelog"><p class="nota-avancado">Carregando…</p></div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

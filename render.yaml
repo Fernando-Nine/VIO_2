@@ -1,0 +1,22 @@
+# Blueprint do Render pro VIO.
+#
+# No painel do Render: New > Blueprint > selecione este repositorio.
+# O Render encontra este arquivo sozinho e configura o servico com os
+# valores abaixo — so confirmar.
+#
+# Alternativa manual (sem Blueprint): New > Web Service, selecione o
+# repositorio e preencha:
+#   Runtime: Node
+#   Build Command: npm install
+#   Start Command: npm start
+#   Instance Type: Free
+
+services:
+  - type: web
+    name: vio
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeployTrigger: commit

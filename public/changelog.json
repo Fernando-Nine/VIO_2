@@ -1,0 +1,63 @@
+[
+  {
+    "versao": "1.2.0",
+    "data": "2026-08-24",
+    "mudancas": [
+      { "tipo": "alterado", "texto": "Cada transmissão agora só se conecta a quem está de fato assistindo ela no momento, em vez de ir automaticamente para a sala inteira — usa menos banda quando várias pessoas compartilham ao mesmo tempo." },
+      { "tipo": "corrigido", "texto": "O brilho ao redor do vídeo não desaparecia mais com a inatividade nem em tela cheia, atrapalhando a visualização." },
+      { "tipo": "adicionado", "texto": "Aviso na tela quando uma conexão específica falha (comum em redes mais restritas), em vez de só ficar com a tela preta sem explicação." },
+      { "tipo": "adicionado", "texto": "Licença AGPLv3 e README reescrito como apresentação do projeto." }
+    ]
+  },
+  {
+    "versao": "1.1.0",
+    "data": "2026-08-23",
+    "mudancas": [
+      { "tipo": "seguranca", "texto": "Limite de criação de salas e de mensagens por conexão, validação de origem no Socket.IO." },
+      { "tipo": "adicionado", "texto": "Número de versão e este histórico de mudanças, direto no app." }
+    ]
+  },
+  {
+    "versao": "1.0.1",
+    "mudancas": [
+      { "tipo": "corrigido", "texto": "As folhas (Ajustes, Participantes, Sobre a sala) continuavam clicáveis mesmo fechadas no computador, roubando clique de outros botões." }
+    ]
+  },
+  {
+    "versao": "1.0.0",
+    "mudancas": [
+      { "tipo": "alterado", "texto": "Interface refeita do zero, mobile-first: alvos de toque maiores, folhas deslizantes no lugar de menus apertados, fonte Poppins." },
+      { "tipo": "adicionado", "texto": "Seletor de transmissões com miniatura de vídeo ao vivo de cada pessoa compartilhando, não só o nome." },
+      { "tipo": "corrigido", "texto": "Estouro de tela para os lados em telas estreitas." }
+    ]
+  },
+  {
+    "versao": "0.5.0",
+    "mudancas": [
+      { "tipo": "alterado", "texto": "Rebrand de Tela Junto para VIO." },
+      { "tipo": "adicionado", "texto": "Configuração pronta para publicar no Render." }
+    ]
+  },
+  {
+    "versao": "0.3.0",
+    "mudancas": [
+      { "tipo": "adicionado", "texto": "Mais de uma pessoa pode compartilhar a tela ao mesmo tempo na mesma sala." },
+      { "tipo": "corrigido", "texto": "Conexão quebrava quando duas pessoas compartilhavam uma para a outra simultaneamente." }
+    ]
+  },
+  {
+    "versao": "0.2.0",
+    "mudancas": [
+      { "tipo": "adicionado", "texto": "Prévia da própria tela para quem compartilha, com opção de ocultar." },
+      { "tipo": "adicionado", "texto": "Volume individual e tela cheia para quem assiste." },
+      { "tipo": "adicionado", "texto": "Sons de início e fim de compartilhamento, indicador de ping." },
+      { "tipo": "corrigido", "texto": "Áudio da tela vinha com cancelamento de eco e ganho automático ligados por padrão, causando oscilação de volume — desligados." }
+    ]
+  },
+  {
+    "versao": "0.1.0",
+    "mudancas": [
+      { "tipo": "adicionado", "texto": "Primeira versão: compartilhamento de tela com controle de qualidade e áudio ao vivo." }
+    ]
+  }
+]
