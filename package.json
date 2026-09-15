@@ -1,8 +1,17 @@
 {
   "name": "vio",
-  "version": "0.1.0",
-  "private": true,
+  "version": "1.2.0",
+  "description": "Compartilhamento de tela P2P para assistir conteudo com amigos, com controle de qualidade/FPS e roteamento de audio.",
+  "main": "server.js",
+  "license": "AGPL-3.0-or-later",
   "scripts": {
-    "dev": "python3 -m http.server 3000"
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
   }
 }
