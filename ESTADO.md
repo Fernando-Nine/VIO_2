@@ -3,7 +3,7 @@
 Arquivo vivo. O `CLAUDE.md` guarda as regras permanentes (e fica curto de propósito); **este
 guarda onde estamos**. Substitui o antigo `ESTADO-DO-PROJETO.md`, que ficou desatualizado.
 
-Última atualização: **15/09/2026** · Versão do app: **1.7.1**
+Última atualização: **15/09/2026** · Versão do app: **1.8.0**
 
 ---
 
@@ -128,10 +128,37 @@ valia só para a conversa.
 > mídia alta — a resposta é fone de ouvido. É por isso que os ícones `headphones` e
 > `noise-cancelling-headphones` estão baixados.
 
+**Câmera** (1.8.0) — canal próprio (`canal: 'camera'`), lista própria no servidor
+(`cameraIds`), conexões separadas das de tela e das de voz. O desenho é o da voz; o
+comportamento é o da **tela**: sob demanda, só conecta com quem focou nela. Vídeo é caro demais
+para sair para a sala inteira sem ninguém olhando — e é exatamente por a voz não poder ser sob
+demanda que ela é quem define o teto de ~6.
+
+A câmera pega **só vídeo** (`audio: false`): microfone continua sendo do canal de voz, com os
+ajustes dele. Os controles de qualidade também não valem para ela — são da tela, calibrados para
+texto pequeno; a câmera tem teto próprio e fixo (`BITRATE_CAMERA`, 1.2 Mbps).
+
+O que essa versão mexeu na estrutura, e é o ponto que importa daqui pra frente: **a chave de uma
+transmissão deixou de ser o `socket.id` e virou `"socketId|canal"`** (`chaveDe` /
+`partesDaChave`). Sem isso, quem transmite tela e câmera ao mesmo tempo teria as duas ocupando a
+mesma entrada em `streamsDisponiveis`, nos PCs e nas filas de ICE — uma apagaria a outra. A voz
+é a exceção: uma conexão por par, bidirecional, continua indexada só pelo id.
+
+Virar frontal/traseira usa `replaceTrack` nas conexões que já existem, nunca renegociação —
+renegociar faria a imagem piscar preto em quem está assistindo, por nada. O botão fica na barra
+do vídeo (não no rodapé): ele age sobre o que está na moldura, e só aparece quando a moldura é a
+própria câmera num aparelho com mais de uma. A frontal aparece espelhada **só na própria
+prévia**; quem assiste recebe a imagem como ela é, senão texto e placa sairiam ao contrário.
+
+> **Um foco por vez.** Trocar de transmissão solta a anterior — inclusive entre tela e câmera da
+> mesma pessoa. É o comportamento certo num mesh: ninguém deve carregar dois vídeos enquanto
+> olha para um só.
+
 **Reconexão** (1.3.0) — queda de rede ou restart do servidor: o cliente volta sozinho para a
 sala, sem F5. O `socket.id` muda na volta, então todos os mapas indexados por id são refeitos
 do zero a partir do `room-state`. Quem estava compartilhando volta compartilhando — o
-`localStream` sobrevive à queda de propósito, senão o navegador pediria a tela de novo. Se a
+`localStream` sobrevive à queda de propósito, senão o navegador pediria a tela de novo. O mesmo
+vale para o microfone e, desde a 1.8.0, para a câmera. Se a
 reentrada bater no limite de taxa (rede instável com o servidor vivo), o cliente espera e tenta
 de novo, com jitter, até cinco vezes antes de pedir F5.
 
@@ -145,14 +172,14 @@ changelog dentro do app; AGPLv3.
 
 ## 3. O que NÃO existe (apesar de discutido)
 
-- **Câmera** — só a decisão de arquitetura (conexões separadas das de tela). Zero código.
-  Segue o mesmo padrão da voz: `canal: 'camera'` na sinalização.
 - **TURN** — discutido a fundo (relay de último recurso, credenciais efêmeras, ligar por
   variável de ambiente), nada implementado. Só STUN do Google hoje.
   **Sintoma já confirmado na prática:** um amigo não consegue ver a tela de ninguém, enquanto a
   maioria vê normal. É a assinatura de NAT simétrico — STUN não atravessa, só TURN. Agora é o
-  item **2** do roadmap, e com voz no ar ele pesa mais: a voz é sempre-para-todos, então cada
-  par que não consegue conexão direta vira um "eu escuto todo mundo menos o Fulano".
+  item do roadmap que mais muda a vida de quem hoje não consegue usar o VIO, e com voz no ar ele pesa mais: a voz é sempre-para-todos, então cada
+  par que não consegue conexão direta vira um "eu escuto todo mundo menos o Fulano". Com a
+  câmera (1.8.0) ele pesa igual: é mais um canal que simplesmente não conecta pra esse amigo.
+  Agora é o item **1** do roadmap.
 - **Tauri + WASAPI** — 100% planejamento. Nenhum projeto Tauri criado.
 - **Segurança pendente** — Helmet.js, validação formal de payload do Socket.IO, log
   estruturado, hash de senha (se um dia existir conta).

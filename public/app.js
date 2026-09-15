@@ -28,6 +28,11 @@ const PALAVRAS_SALA = ['PIPOCA', 'SESSAO', 'BUTECO', 'MARATONA', 'CINEMINHA', 'R
 
 const DURACAO_INATIVIDADE_MS = 3000;
 
+// A camera nao tem controle de qualidade proprio: os ajustes de qualidade sao da
+// TELA (texto pequeno, leitura). Rosto em 720p/30fps cabe folgado em 1.2 Mbps, e
+// como a camera e sob demanda, esse teto so pesa quando alguem esta olhando.
+const BITRATE_CAMERA = 1_200_000;
+
 // Acima disso o avatar ganha o anel de "falando". Baixo o bastante pra pegar voz
 // normal, alto o bastante pra nao piscar com ruido de fundo.
 const LIMIAR_FALANDO = 8;
@@ -85,6 +90,9 @@ const selectSaida = document.getElementById('select-saida');
 const blocoSaida = document.getElementById('bloco-saida');
 const chkEco = document.getElementById('chk-eco');
 const chkRuido = document.getElementById('chk-ruido');
+const btnCamera = document.getElementById('btn-camera');
+const iconeCamera = document.getElementById('icone-camera');
+const btnVirarCamera = document.getElementById('btn-virar-camera');
 const btnCompartilhar = document.getElementById('btn-compartilhar');
 const medidorVozLocal = document.getElementById('medidor-voz-local');
 
@@ -138,10 +146,13 @@ const estado = {
   salaCriadaEm: null,
   participantes: new Map(), // id -> nome (todo mundo, EXCETO eu)
   sharingIds: new Set(), // quem esta compartilhando agora (pode ser mais de um, inclusive eu)
-  streamsDisponiveis: new Map(), // id -> MediaStream (transmissoes que ja consigo exibir)
-  focoAtual: null, // id de quem estou vendo no momento (pode ser o meu proprio)
+  streamsDisponiveis: new Map(), // chave "id|canal" -> MediaStream (transmissoes que ja consigo exibir)
+  focoAtual: null, // chave da transmissao que estou vendo agora (pode ser a minha propria)
   localStream: null, // meu stream de captura, se eu estiver compartilhando
   streamPendente: null, // stream capturado aguardando confirmacao do servidor
+  cameraIds: new Set(), // quem esta com a camera ligada (pode me incluir)
+  cameraStream: null, // minha camera, se estiver ligada
+  cameraFrontal: true, // qual lado da camera no celular (frontal = selfie)
   voiceIds: new Set(), // quem esta no canal de voz (pode me incluir)
   vozStream: null, // meu microfone, se eu estiver na voz
   vozMudo: false, // mudo local: a conexao continua, a track e que para de mandar
@@ -156,10 +167,12 @@ const estado = {
   saidaId: '', // deviceId da saida de audio ('' = padrao do sistema)
 };
 
-const outgoingPCs = new Map(); // peerId -> RTCPeerConnection (uso pra cada pessoa que assiste MEU compartilhamento)
-const filasIceSaida = new Map(); // peerId -> candidatos ICE recebidos antes da hora (lado de saida)
-const incomingPCs = new Map(); // peerId -> RTCPeerConnection (uma por transmissao que estou recebendo)
-const filasIceEntrada = new Map(); // peerId -> candidatos ICE recebidos antes da hora (lado de entrada)
+// Todos indexados por chave composta "peerId|canal" (ver chaveDe): quem assiste
+// minha tela E minha camera precisa de duas conexoes, uma por canal.
+const outgoingPCs = new Map(); // chave -> RTCPeerConnection (uma por pessoa que assiste algo MEU)
+const filasIceSaida = new Map(); // chave -> candidatos ICE recebidos antes da hora (lado de saida)
+const incomingPCs = new Map(); // chave -> RTCPeerConnection (uma por transmissao que estou recebendo)
+const filasIceEntrada = new Map(); // chave -> candidatos ICE recebidos antes da hora (lado de entrada)
 
 // Voz: UMA conexao por par, bidirecional — diferente da tela, que tem uma de ida
 // e outra de volta. Por isso aqui nao existe "papel": vozPCs.get(from) ja e unico.
@@ -187,6 +200,22 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+// Uma pessoa pode transmitir tela E camera ao mesmo tempo, entao nada que
+// descreve uma transmissao pode ser indexado so pelo socket.id. A chave e o par
+// "id|canal" — e e ela que anda por streamsDisponiveis, focoAtual, PCs e filas.
+function chaveDe(id, canal) {
+  return `${id}|${canal}`;
+}
+
+function partesDaChave(chave) {
+  const corte = String(chave).lastIndexOf('|');
+  return { id: chave.slice(0, corte), canal: chave.slice(corte + 1) };
+}
+
+function idDaChave(chave) {
+  return partesDaChave(chave).id;
 }
 
 function nomeDoParticipante(id) {
@@ -445,6 +474,7 @@ btnSairSala.addEventListener('click', () => {
   clearTimeout(timerReentrada);
 
   if (estado.sharingIds.has(socket.id)) pararCompartilhamento();
+  if (estado.cameraStream) desligarCamera();
   if (estado.voiceIds.has(socket.id)) socket.emit('stop-voice');
   largarVoz();
   incomingPCs.forEach((pc) => pc.close());
@@ -457,6 +487,7 @@ btnSairSala.addEventListener('click', () => {
   socket.disconnect();
   estado.participantes.clear();
   estado.sharingIds.clear();
+  estado.cameraIds.clear();
   estado.streamsDisponiveis.clear();
   estado.focoAtual = null;
 
@@ -524,6 +555,15 @@ function renderizarParticipantes() {
     const avatar = esquerda.querySelector('.avatar-participante');
     if (avatar && (niveisVoz.get(id) || 0) > LIMIAR_FALANDO) avatar.classList.add('falando');
 
+    // A camera aparece como icone, do lado do microfone: quem esta com tela E
+    // camera no ar precisa dos dois sinais ao mesmo tempo.
+    if (estado.cameraIds.has(id)) {
+      const cam = document.createElement('span');
+      cam.className = 'icone icone-video-camera-alt';
+      cam.setAttribute('aria-label', 'com a câmera ligada');
+      esquerda.appendChild(cam);
+    }
+
     item.appendChild(esquerda);
     if (estado.sharingIds.has(id)) {
       const badge = document.createElement('span');
@@ -558,27 +598,31 @@ function renderizarParticipantes() {
 function atualizarBotaoCompartilhar() {
   if (!suportaCompartilhamento) return;
 
-  if (estado.sharingIds.has(socket.id)) {
-    btnCompartilhar.innerHTML = '<span class="icone icone-computer" aria-hidden="true"></span>Parar compartilhamento';
-    btnCompartilhar.classList.add('compartilhando');
-  } else {
-    btnCompartilhar.innerHTML = '<span class="icone icone-computer" aria-hidden="true"></span>Compartilhar tela';
-    btnCompartilhar.classList.remove('compartilhando');
-  }
+  // O rotulo vive num span proprio porque some em tela estreita (ver style.css):
+  // num celular o rodape nao comporta o texto junto dos botoes de icone. Dai o
+  // aria-label ficar sempre preenchido — quem usa leitor de tela nao perde nada.
+  const parando = estado.sharingIds.has(socket.id);
+  const texto = parando ? 'Parar compartilhamento' : 'Compartilhar tela';
+  btnCompartilhar.innerHTML = `<span class="icone icone-computer" aria-hidden="true"></span><span class="rotulo-botao">${texto}</span>`;
+  btnCompartilhar.setAttribute('aria-label', texto);
+  btnCompartilhar.title = texto;
+  btnCompartilhar.classList.toggle('compartilhando', parando);
   btnCompartilhar.disabled = false; // varias pessoas podem compartilhar ao mesmo tempo, entao nunca trava por causa de outra
 }
 
-socket.on('room-state', ({ participants, sharingIds, voiceIds, criadaEm }) => {
+socket.on('room-state', ({ participants, sharingIds, voiceIds, cameraIds, criadaEm }) => {
   estado.participantes.clear();
   participants.forEach((p) => {
     if (p.id !== socket.id) estado.participantes.set(p.id, p.name);
   });
   estado.sharingIds = new Set(sharingIds);
   estado.voiceIds = new Set(voiceIds || []);
+  estado.cameraIds = new Set(cameraIds || []);
   estado.salaCriadaEm = criadaEm;
   renderizarParticipantes();
   atualizarBotaoCompartilhar();
   atualizarBotaoMicrofone();
+  atualizarBotaoCamera();
 
   const acabeiDeVoltar = reconectando;
   if (acabeiDeVoltar) {
@@ -596,12 +640,16 @@ socket.on('room-state', ({ participants, sharingIds, voiceIds, criadaEm }) => {
       reancorarAnalisadorLocal();
       socket.emit('start-voice');
     }
+    // E a camera, pelo mesmo motivo: derrubar o stream faria o navegador pedir
+    // permissao de novo, entao ele sobrevive e so as conexoes renascem.
+    if (estado.cameraStream) socket.emit('start-camera');
   }
 
   sincronizarConexoesVoz();
 
-  if (estado.sharingIds.size > 0) focarEm([...estado.sharingIds][0]); // ja tem gente compartilhando - foca na primeira automaticamente
-  else if (acabeiDeVoltar && !estado.localStream) resetarMoldura(); // tira o aviso de "Reconectando..."
+  const ativas = transmissoesDaSala();
+  if (ativas.length > 0) focarEm(ativas[0]); // ja tem gente no ar - foca na primeira automaticamente
+  else if (acabeiDeVoltar && !estado.localStream && !estado.cameraStream) resetarMoldura(); // tira o aviso de "Reconectando..."
 });
 
 socket.on('participant-joined', ({ id, name }) => {
@@ -619,11 +667,15 @@ socket.on('participant-left', ({ id }) => {
   renderizarParticipantes();
   if (nome) mostrarAlerta(`${nome} saiu da sala.`);
 
-  if (outgoingPCs.has(id)) {
-    outgoingPCs.get(id).close();
-    outgoingPCs.delete(id);
-    filasIceSaida.delete(id);
-  }
+  // quem sai leva embora TODAS as conexoes de saida que eu mantinha pra ela —
+  // a da tela e a da camera. O share-stopped/camera-stopped do servidor cuida
+  // do outro lado (o que EU estava assistindo dela).
+  outgoingPCs.forEach((pc, chave) => {
+    if (idDaChave(chave) !== id) return;
+    pc.close();
+    outgoingPCs.delete(chave);
+    filasIceSaida.delete(chave);
+  });
   encerrarConexaoVoz(id);
 });
 
@@ -666,6 +718,7 @@ function reentrarNaSala() {
   estado.participantes.clear();
   estado.sharingIds.clear();
   estado.voiceIds.clear();
+  estado.cameraIds.clear();
   estado.streamsDisponiveis.clear();
   estado.focoAtual = null;
 
@@ -732,6 +785,7 @@ function resetarMoldura() {
   barraVideo.classList.add('oculto');
   controleVolume.classList.add('oculto');
   btnAlternarPrevia.classList.add('oculto');
+  btnVirarCamera.classList.add('oculto');
   btnDesbloquearAudio.classList.add('oculto');
   overlayPlaceholder.classList.remove('oculto');
   textoPlaceholderEl.textContent = 'Ninguém está compartilhando a tela ainda.';
@@ -744,36 +798,51 @@ function resetarMoldura() {
 
 // pede pra assistir a transmissao de alguem (a pessoa so vai me conectar
 // depois de receber isso — nada de conexao proativa "pra sala inteira")
-function solicitarTransmissao(peerId) {
-  socket.emit('signal', { to: peerId, payload: { tipo: 'watch-request' } });
+function solicitarTransmissao(chave) {
+  const { id, canal } = partesDaChave(chave);
+  socket.emit('signal', { to: id, payload: { tipo: 'watch-request', canal } });
 }
 
 // avisa que parei de assistir, e libera a conexao correspondente
-function pararDeAssistir(peerId) {
-  socket.emit('signal', { to: peerId, payload: { tipo: 'watch-stop' } });
-  if (incomingPCs.has(peerId)) {
-    incomingPCs.get(peerId).close();
-    incomingPCs.delete(peerId);
-    filasIceEntrada.delete(peerId);
+function pararDeAssistir(chave) {
+  const { id, canal } = partesDaChave(chave);
+  socket.emit('signal', { to: id, payload: { tipo: 'watch-stop', canal } });
+  if (incomingPCs.has(chave)) {
+    incomingPCs.get(chave).close();
+    incomingPCs.delete(chave);
+    filasIceEntrada.delete(chave);
   }
-  estado.streamsDisponiveis.delete(peerId);
+  estado.streamsDisponiveis.delete(chave);
+}
+
+// Todas as transmissoes que existem na sala agora, tela e camera juntas, na
+// ordem em que aparecem na tira.
+function transmissoesDaSala() {
+  return [
+    ...[...estado.sharingIds].map((id) => chaveDe(id, 'tela')),
+    ...[...estado.cameraIds].map((id) => chaveDe(id, 'camera')),
+  ];
+}
+
+function souAOrigem(chave) {
+  return idDaChave(chave) === socket.id;
 }
 
 // escolhida pelo usuario (clique numa miniatura, ou foco automatico) — pode
 // precisar pedir a transmissao antes de ter algo pra mostrar
-function focarEm(peerId) {
-  if (peerId === estado.focoAtual) return;
+function focarEm(chave) {
+  if (chave === estado.focoAtual) return;
 
-  if (estado.focoAtual && estado.focoAtual !== socket.id) {
+  if (estado.focoAtual && !souAOrigem(estado.focoAtual)) {
     pararDeAssistir(estado.focoAtual); // solta quem eu estava assistindo antes
   }
 
-  estado.focoAtual = peerId;
+  estado.focoAtual = chave;
 
-  if (peerId === socket.id || estado.streamsDisponiveis.has(peerId)) {
+  if (souAOrigem(chave) || estado.streamsDisponiveis.has(chave)) {
     exibirFoco();
   } else {
-    solicitarTransmissao(peerId);
+    solicitarTransmissao(chave);
     mostrarPlaceholder('Conectando à transmissão...');
     renderizarTiraTransmissoes();
     registrarAtividadeVideo();
@@ -783,11 +852,11 @@ function focarEm(peerId) {
 // mostra na moldura o que ja esta em estado.focoAtual — chamada direto pelo
 // focarEm quando o stream ja existe, ou depois que uma oferta chega (ontrack)
 function exibirFoco() {
-  const peerId = estado.focoAtual;
-  const stream = estado.streamsDisponiveis.get(peerId);
+  const chave = estado.focoAtual;
+  const stream = estado.streamsDisponiveis.get(chave);
   if (!stream) return;
 
-  const souEu = peerId === socket.id;
+  const souEu = souAOrigem(chave);
 
   overlayPlaceholder.classList.add('oculto');
   molduraVideo.classList.add('ao-vivo');
@@ -811,34 +880,38 @@ function exibirFoco() {
     if (p && p.catch) p.catch(() => btnDesbloquearAudio.classList.remove('oculto'));
   }
 
+  aplicarEspelhoDaCamera();
   renderizarTiraTransmissoes();
   registrarAtividadeVideo();
 }
 
-// tira de miniaturas: uma opcao por PESSOA COMPARTILHANDO (nao por conexao
-// que eu ja tenho aberta — agora so existe conexao com quem estou assistindo
-// de fato). Quem nao esta em foco mostra so as iniciais; video ao vivo
-// aparece na hora em que voce realmente clica pra ver aquela pessoa.
+// tira de miniaturas: uma opcao por TRANSMISSAO (nao por pessoa — quem estiver
+// com tela e camera no ar aparece duas vezes). Quem nao esta em foco mostra so
+// as iniciais; video ao vivo aparece quando voce clica pra ver de fato.
 function renderizarTiraTransmissoes() {
-  const ids = [...estado.sharingIds];
-  if (ids.length <= 1) {
+  const chaves = transmissoesDaSala();
+  if (chaves.length <= 1) {
     tiraTransmissoes.classList.add('oculto');
     tiraTransmissoes.innerHTML = '';
     return;
   }
   tiraTransmissoes.classList.remove('oculto');
 
-  const existentes = new Map([...tiraTransmissoes.children].map((el) => [el.dataset.id, el]));
-  const idsAtuais = new Set();
+  const existentes = new Map([...tiraTransmissoes.children].map((el) => [el.dataset.chave, el]));
+  const atuais = new Set();
 
-  ids.forEach((id) => {
-    idsAtuais.add(id);
-    let cartao = existentes.get(id);
+  chaves.forEach((chave) => {
+    atuais.add(chave);
+    const { id, canal } = partesDaChave(chave);
+    const nome = nomeDoParticipante(id);
+    const rotuloCanal = canal === 'camera' ? `${nome} · câmera` : nome;
+
+    let cartao = existentes.get(chave);
     if (!cartao) {
       cartao = document.createElement('button');
       cartao.type = 'button';
       cartao.className = 'cartao-transmissao';
-      cartao.dataset.id = id;
+      cartao.dataset.chave = chave;
 
       const video = document.createElement('video');
       video.muted = true;
@@ -854,12 +927,12 @@ function renderizarTiraTransmissoes() {
       cartao.appendChild(video);
       cartao.appendChild(inicial);
       cartao.appendChild(rotulo);
-      cartao.addEventListener('click', () => focarEm(id));
+      cartao.addEventListener('click', () => focarEm(chave));
       tiraTransmissoes.appendChild(cartao);
     }
 
     const video = cartao.querySelector('video');
-    const stream = estado.streamsDisponiveis.get(id);
+    const stream = estado.streamsDisponiveis.get(chave);
     if (stream) {
       if (video.srcObject !== stream) video.srcObject = stream;
       video.play?.().catch(() => {});
@@ -869,14 +942,14 @@ function renderizarTiraTransmissoes() {
       cartao.classList.add('sem-previa');
     }
 
-    cartao.querySelector('.cartao-inicial').textContent = iniciaisDoNome(nomeDoParticipante(id));
-    cartao.querySelector('.rotulo-cartao').textContent = nomeDoParticipante(id);
-    cartao.classList.toggle('ativo', id === estado.focoAtual);
-    cartao.setAttribute('aria-label', `Ver transmissão de ${nomeDoParticipante(id)}`);
+    cartao.querySelector('.cartao-inicial').textContent = iniciaisDoNome(nome);
+    cartao.querySelector('.rotulo-cartao').textContent = rotuloCanal;
+    cartao.classList.toggle('ativo', chave === estado.focoAtual);
+    cartao.setAttribute('aria-label', `Ver ${rotuloCanal}`);
   });
 
-  existentes.forEach((cartao, id) => {
-    if (!idsAtuais.has(id)) cartao.remove();
+  existentes.forEach((cartao, chave) => {
+    if (!atuais.has(chave)) cartao.remove();
   });
 }
 
@@ -887,8 +960,8 @@ function aplicarVisibilidadePrevia() {
   iconePrevia.classList.toggle('icone-eye-crossed', !previaVisivel);
   btnAlternarPrevia.title = previaVisivel ? 'Ocultar sua prévia' : 'Mostrar sua prévia';
 
-  if (estado.focoAtual !== socket.id) return;
-  const streamPropria = estado.streamsDisponiveis.get(socket.id);
+  if (!estado.focoAtual || !souAOrigem(estado.focoAtual)) return;
+  const streamPropria = estado.streamsDisponiveis.get(estado.focoAtual);
   if (!streamPropria) return;
 
   if (previaVisivel) {
@@ -907,6 +980,7 @@ function aplicarVisibilidadePrevia() {
 btnAlternarPrevia.addEventListener('click', () => {
   previaVisivel = !previaVisivel;
   aplicarVisibilidadePrevia();
+  aplicarEspelhoDaCamera();
 });
 
 // ---- volume (so existe sentido quando o foco NAO sou eu mesmo) ----
@@ -1061,7 +1135,7 @@ function confirmarInicioCompartilhamento() {
   const stream = estado.streamPendente;
   estado.streamPendente = null;
   estado.localStream = stream;
-  estado.streamsDisponiveis.set(socket.id, stream);
+  estado.streamsDisponiveis.set(chaveDe(socket.id, 'tela'), stream);
 
   const trackVideo = stream.getVideoTracks()[0];
   const trackAudio = stream.getAudioTracks()[0];
@@ -1073,10 +1147,34 @@ function confirmarInicioCompartilhamento() {
 
   trackVideo.addEventListener('ended', pararCompartilhamento);
 
-  focarEm(socket.id);
+  focarEm(chaveDe(socket.id, 'tela'));
   mostrarAlerta('Compartilhamento iniciado! Espelho infinito na tela? Você escolheu esta própria aba/janela — troque, ou toque no olho pra ocultar sua prévia.', 6500);
 
   aplicarQualidadeATodasConexoes(lerValoresQualidadeAtual());
+}
+
+// Fecha as conexoes de SAIDA de um canal so. As de outro canal continuam —
+// parar a tela nao pode derrubar a camera de quem esta transmitindo as duas.
+function fecharSaidasDoCanal(canal) {
+  outgoingPCs.forEach((pc, chave) => {
+    if (partesDaChave(chave).canal !== canal) return;
+    pc.close();
+    outgoingPCs.delete(chave);
+    filasIceSaida.delete(chave);
+  });
+}
+
+// Depois que uma transmissao some, escolhe a proxima pra mostrar — ou limpa a
+// moldura se nao sobrou nenhuma.
+function seguirParaProximaTransmissao(chaveQueSaiu) {
+  if (estado.focoAtual !== chaveQueSaiu) {
+    renderizarTiraTransmissoes();
+    return;
+  }
+  estado.focoAtual = null;
+  const restantes = transmissoesDaSala().filter((c) => c !== chaveQueSaiu);
+  if (restantes.length > 0) focarEm(restantes[0]);
+  else resetarMoldura();
 }
 
 function pararCompartilhamento() {
@@ -1091,39 +1189,204 @@ function pararCompartilhamento() {
     estado.localStream.getTracks().forEach((t) => t.stop());
     estado.localStream = null;
   }
-  outgoingPCs.forEach((pc) => pc.close());
-  outgoingPCs.clear();
-  filasIceSaida.clear();
-  estado.streamsDisponiveis.delete(socket.id);
+  fecharSaidasDoCanal('tela');
 
-  if (estado.focoAtual === socket.id) {
-    const restantes = [...estado.sharingIds].filter((id) => id !== socket.id);
-    estado.focoAtual = null;
-    if (restantes.length > 0) focarEm(restantes[0]);
-    else resetarMoldura();
-  }
+  const minhaChave = chaveDe(socket.id, 'tela');
+  estado.streamsDisponiveis.delete(minhaChave);
+  estado.sharingIds.delete(socket.id);
+  seguirParaProximaTransmissao(minhaChave);
+  estado.sharingIds.add(socket.id); // o eco do servidor e quem remove de verdade
 
   socket.emit('stop-share');
-  // atencao: NAO mexemos em estado.sharingIds aqui de proposito — isso e feito
-  // quando o eco 'share-stopped' voltar do servidor, o mesmo caminho usado
+  // atencao: NAO mexemos em estado.sharingIds de forma definitiva aqui — isso e
+  // feito quando o eco 'share-stopped' voltar do servidor, o mesmo caminho usado
   // quando OUTRA pessoa para de compartilhar. Assim o som de "desativado" toca
   // igual pra todo mundo, incluindo quem acabou de parar.
 }
 
-async function iniciarConexaoSaida(peerId) {
-  const pc = criarConexao();
-  outgoingPCs.set(peerId, pc);
+// ---------------------------------------------------------------------------
+// Camera
+//
+// Mesmo desenho da voz (canal proprio, conexoes separadas, lista propria no
+// servidor), mas o comportamento e o da TELA: sob demanda. Video custa caro
+// demais pra sair pra sala inteira sem ninguem estar olhando — so quem focar na
+// camera de alguem e que abre conexao com ela.
+//
+// Nada aqui encosta no grafo de audio: a camera pega SO video. O microfone
+// continua sendo do canal de voz, com seus proprios ajustes.
+// ---------------------------------------------------------------------------
 
-  estado.localStream.getTracks().forEach((track) => pc.addTrack(track, estado.localStream));
-  await aplicarQualidadeNaConexao(pc, lerValoresQualidadeAtual());
+const suportaCamera = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+
+let podeVirarCamera = false; // so vira se o aparelho tiver mais de uma camera
+
+function atualizarBotaoCamera() {
+  if (!btnCamera) return;
+
+  const ligada = estado.cameraIds.has(socket.id);
+  iconeCamera.classList.toggle('icone-video-camera-alt', ligada);
+  iconeCamera.classList.toggle('icone-video-slash', !ligada);
+  btnCamera.classList.toggle('ativo', ligada);
+  btnCamera.setAttribute('aria-pressed', String(ligada));
+  btnCamera.setAttribute('aria-label', ligada ? 'Desligar a câmera' : 'Ligar a câmera');
+  btnCamera.title = btnCamera.getAttribute('aria-label');
+  btnCamera.disabled = !suportaCamera;
+}
+
+async function conferirSePodeVirar() {
+  try {
+    const dispositivos = await navigator.mediaDevices.enumerateDevices();
+    podeVirarCamera = dispositivos.filter((d) => d.kind === 'videoinput').length > 1;
+  } catch {
+    podeVirarCamera = false;
+  }
+}
+
+function restricaoDeCamera() {
+  return {
+    video: {
+      facingMode: estado.cameraFrontal ? 'user' : 'environment',
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+      frameRate: { ideal: 30, max: 30 },
+    },
+    audio: false, // o microfone e do canal de voz, e so de la
+  };
+}
+
+async function ligarCamera() {
+  // cameraStream tambem barra: durante uma reconexao cameraIds esta vazio, mas a
+  // camera continua aberta — sem essa guarda o navegador abriria uma segunda.
+  if (estado.cameraIds.has(socket.id) || estado.cameraStream) return;
+
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia(restricaoDeCamera());
+  } catch (erro) {
+    if (erro.name !== 'NotAllowedError') {
+      mostrarAlerta('Não foi possível ligar a câmera: ' + erro.message);
+    }
+    return;
+  }
+
+  estado.cameraStream = stream;
+  await conferirSePodeVirar(); // o rotulo/contagem so vem completo depois da permissao
+  stream.getVideoTracks()[0].addEventListener('ended', desligarCamera);
+  socket.emit('start-camera');
+}
+
+function desligarCamera() {
+  if (!estado.cameraStream) return;
+
+  estado.cameraStream.getTracks().forEach((t) => t.stop());
+  estado.cameraStream = null;
+  fecharSaidasDoCanal('camera');
+
+  const minhaChave = chaveDe(socket.id, 'camera');
+  estado.streamsDisponiveis.delete(minhaChave);
+
+  // Tiro da lista antes de escolher a proxima transmissao pra ela nao se
+  // oferecer como opcao, e devolvo em seguida: quem tira de verdade e o eco
+  // 'camera-stopped' do servidor, o mesmo caminho de quando OUTRA pessoa
+  // desliga a camera. Assim o botao e o som acontecem igual pra todo mundo.
+  const estavaNaLista = estado.cameraIds.delete(socket.id);
+  seguirParaProximaTransmissao(minhaChave);
+  if (estavaNaLista) estado.cameraIds.add(socket.id);
+
+  socket.emit('stop-camera');
+}
+
+// Trocar frontal/traseira sem derrubar a conexao: o que muda e a TRACK dentro
+// das PeerConnections que ja existem (replaceTrack), nao a conexao. Renegociar
+// aqui daria um piscar preto em quem esta assistindo, por nada.
+async function virarCamera() {
+  if (!estado.cameraStream) return;
+
+  estado.cameraFrontal = !estado.cameraFrontal;
+
+  let novoStream;
+  try {
+    novoStream = await navigator.mediaDevices.getUserMedia(restricaoDeCamera());
+  } catch (erro) {
+    estado.cameraFrontal = !estado.cameraFrontal; // desfaz: a camera de tras nao veio
+    mostrarAlerta('Não foi possível virar a câmera: ' + erro.message);
+    return;
+  }
+
+  const novaTrack = novoStream.getVideoTracks()[0];
+  const antiga = estado.cameraStream.getVideoTracks()[0];
+
+  await Promise.all(
+    [...outgoingPCs.entries()]
+      .filter(([chave]) => partesDaChave(chave).canal === 'camera')
+      .map(([, pc]) => {
+        const emissor = pc.getSenders().find((s) => s.track && s.track.kind === 'video');
+        return emissor ? emissor.replaceTrack(novaTrack) : Promise.resolve();
+      })
+  );
+
+  estado.cameraStream.removeTrack(antiga);
+  antiga.stop();
+  estado.cameraStream.addTrack(novaTrack);
+  novaTrack.addEventListener('ended', desligarCamera);
+
+  // A moldura segura o MESMO objeto MediaStream, entao o troca-troca de track
+  // ja aparece sozinho — so o espelhamento e que muda de lado.
+  aplicarEspelhoDaCamera();
+}
+
+// Camera frontal espelhada (e o que a pessoa espera de uma selfie); traseira
+// nao, senao texto e placa apareceriam ao contrario. Vale SO pra minha propria
+// previa — quem assiste ve a imagem como ela e.
+//
+// O botao de virar mora na barra do video, nao no rodape: ele age sobre o que
+// esta na moldura, entao so faz sentido quando a moldura e a minha camera (e so
+// aparece se o aparelho tiver mais de uma).
+function aplicarEspelhoDaCamera() {
+  const minhaCamera = estado.focoAtual === chaveDe(socket.id, 'camera');
+  videoRemoto.classList.toggle('espelhado', minhaCamera && estado.cameraFrontal && previaVisivel);
+  btnVirarCamera.classList.toggle('oculto', !(minhaCamera && podeVirarCamera));
+}
+
+if (btnCamera) {
+  btnCamera.addEventListener('click', () => {
+    if (estado.cameraIds.has(socket.id) || estado.cameraStream) desligarCamera();
+    else ligarCamera();
+  });
+  btnVirarCamera.addEventListener('click', virarCamera);
+}
+
+function streamDoCanal(canal) {
+  return canal === 'camera' ? estado.cameraStream : estado.localStream;
+}
+
+function estouTransmitindo(canal) {
+  return canal === 'camera' ? estado.cameraIds.has(socket.id) : estado.sharingIds.has(socket.id);
+}
+
+async function iniciarConexaoSaida(peerId, canal) {
+  const stream = streamDoCanal(canal);
+  if (!stream) return;
+
+  const chave = chaveDe(peerId, canal);
+  const pc = criarConexao(canal);
+  outgoingPCs.set(chave, pc);
+
+  stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
+  if (canal === 'camera') {
+    await aplicarQualidadeNaConexao(pc, { maxBitrate: BITRATE_CAMERA, scale: 1, fps: 30 });
+  } else {
+    await aplicarQualidadeNaConexao(pc, lerValoresQualidadeAtual());
+  }
 
   pc.onicecandidate = (e) => {
-    if (e.candidate) socket.emit('signal', { to: peerId, payload: { tipo: 'ice', papel: 'saida', candidate: e.candidate } });
+    if (e.candidate) socket.emit('signal', { to: peerId, payload: { tipo: 'ice', papel: 'saida', canal, candidate: e.candidate } });
   };
 
   const oferta = await pc.createOffer();
   await pc.setLocalDescription(oferta);
-  socket.emit('signal', { to: peerId, payload: { tipo: 'offer', sdp: pc.localDescription } });
+  socket.emit('signal', { to: peerId, payload: { tipo: 'offer', canal, sdp: pc.localDescription } });
 }
 
 socket.on('share-started', ({ id }) => {
@@ -1132,14 +1395,15 @@ socket.on('share-started', ({ id }) => {
   atualizarBotaoCompartilhar();
   tocarSomAtivado();
 
+  const chave = chaveDe(id, 'tela');
   if (id === socket.id && estado.streamPendente) {
     confirmarInicioCompartilhamento();
   } else if (id === socket.id && estado.localStream) {
     // voltei de uma reconexao ainda com a tela capturada: nao ha stream pendente
     // pra confirmar, e sim o mesmo stream de sempre precisando reaparecer.
-    estado.streamsDisponiveis.set(socket.id, estado.localStream);
+    estado.streamsDisponiveis.set(chave, estado.localStream);
     if (estado.focoAtual) renderizarTiraTransmissoes();
-    else focarEm(socket.id);
+    else focarEm(chave);
   } else {
     renderizarTiraTransmissoes(); // aparece como opcao na tira — so conecta de verdade se alguem focar nela
   }
@@ -1152,21 +1416,45 @@ socket.on('share-stopped', ({ id }) => {
   atualizarBotaoCompartilhar();
   tocarSomDesativado();
 
-  if (incomingPCs.has(id)) {
-    incomingPCs.get(id).close();
-    incomingPCs.delete(id);
-    filasIceEntrada.delete(id);
+  const chave = chaveDe(id, 'tela');
+  if (incomingPCs.has(chave)) {
+    incomingPCs.get(chave).close();
+    incomingPCs.delete(chave);
+    filasIceEntrada.delete(chave);
   }
-  estado.streamsDisponiveis.delete(id);
+  estado.streamsDisponiveis.delete(chave);
+  seguirParaProximaTransmissao(chave);
+});
 
-  if (estado.focoAtual === id) {
-    const restantes = [...estado.sharingIds];
-    estado.focoAtual = null;
-    if (restantes.length > 0) focarEm(restantes[0]);
-    else resetarMoldura();
+socket.on('camera-started', ({ id }) => {
+  estado.cameraIds.add(id);
+  renderizarParticipantes();
+  atualizarBotaoCamera();
+
+  const chave = chaveDe(id, 'camera');
+  if (id === socket.id && estado.cameraStream) {
+    estado.streamsDisponiveis.set(chave, estado.cameraStream);
+    if (estado.focoAtual) renderizarTiraTransmissoes();
+    else focarEm(chave);
   } else {
     renderizarTiraTransmissoes();
   }
+});
+
+socket.on('camera-stopped', ({ id }) => {
+  if (!estado.cameraIds.has(id)) return;
+  estado.cameraIds.delete(id);
+  renderizarParticipantes();
+  atualizarBotaoCamera();
+
+  const chave = chaveDe(id, 'camera');
+  if (incomingPCs.has(chave)) {
+    incomingPCs.get(chave).close();
+    incomingPCs.delete(chave);
+    filasIceEntrada.delete(chave);
+  }
+  estado.streamsDisponiveis.delete(chave);
+  seguirParaProximaTransmissao(chave);
 });
 
 // ---------------------------------------------------------------------------
@@ -1174,58 +1462,61 @@ socket.on('share-stopped', ({ id }) => {
 // ---------------------------------------------------------------------------
 
 socket.on('signal', async ({ from, payload }) => {
-  // Com voz no ar, o MESMO par de pessoas pode ter tres conexoes: minha tela pra
-  // voce, sua tela pra mim, e a voz. O "papel" ja separava as duas primeiras; o
-  // "canal" separa a terceira. Sem isso um candidato ICE de voz acabaria
-  // entregue a uma conexao de tela, que morreria em silencio.
+  // O MESMO par de pessoas pode ter varias conexoes ao mesmo tempo: minha tela
+  // pra voce, sua tela pra mim, minha camera, sua camera, e a voz. O "papel"
+  // separa ida de volta; o "canal" separa tela, camera e voz. Sem os dois, um
+  // candidato ICE acabaria entregue a conexao errada, que morreria em silencio.
   if (payload.canal === 'voz') {
     await tratarSinalVoz(from, payload);
     return;
   }
 
+  const canal = payload.canal === 'camera' ? 'camera' : 'tela';
+  const chave = chaveDe(from, canal);
+
   if (payload.tipo === 'offer') {
-    const pc = criarConexao();
-    incomingPCs.set(from, pc);
+    const pc = criarConexao(canal);
+    incomingPCs.set(chave, pc);
 
     pc.ontrack = (e) => {
-      estado.streamsDisponiveis.set(from, e.streams[0]);
-      if (estado.focoAtual === from) {
+      estado.streamsDisponiveis.set(chave, e.streams[0]);
+      if (estado.focoAtual === chave) {
         exibirFoco(); // eu tinha pedido essa transmissao, e ela acabou de chegar
       } else {
         renderizarTiraTransmissoes();
       }
     };
     pc.onicecandidate = (e) => {
-      if (e.candidate) socket.emit('signal', { to: from, payload: { tipo: 'ice', papel: 'entrada', candidate: e.candidate } });
+      if (e.candidate) socket.emit('signal', { to: from, payload: { tipo: 'ice', papel: 'entrada', canal, candidate: e.candidate } });
     };
 
     await pc.setRemoteDescription(payload.sdp);
-    const filaEntrada = filasIceEntrada.get(from) || [];
+    const filaEntrada = filasIceEntrada.get(chave) || [];
     for (const c of filaEntrada.splice(0)) {
       try { await pc.addIceCandidate(c); } catch (e) { console.warn(e); }
     }
 
     const resposta = await pc.createAnswer();
     await pc.setLocalDescription(resposta);
-    socket.emit('signal', { to: from, payload: { tipo: 'answer', sdp: pc.localDescription } });
+    socket.emit('signal', { to: from, payload: { tipo: 'answer', canal, sdp: pc.localDescription } });
   } else if (payload.tipo === 'watch-request') {
-    // alguem quer assistir MEU compartilhamento — so conecta se eu estiver
-    // mesmo compartilhando agora, e evita duplicar se ja tiver conexao com essa pessoa
-    if (estado.sharingIds.has(socket.id) && estado.localStream && !outgoingPCs.has(from)) {
-      iniciarConexaoSaida(from);
+    // alguem quer assistir uma transmissao MINHA — so conecta se ela existir de
+    // fato agora, e evita duplicar se ja houver conexao desse canal com a pessoa
+    if (estouTransmitindo(canal) && streamDoCanal(canal) && !outgoingPCs.has(chave)) {
+      iniciarConexaoSaida(from, canal);
     }
   } else if (payload.tipo === 'watch-stop') {
-    // essa pessoa nao quer mais assistir — libera a conexao de saida com ela
-    if (outgoingPCs.has(from)) {
-      outgoingPCs.get(from).close();
-      outgoingPCs.delete(from);
-      filasIceSaida.delete(from);
+    // essa pessoa nao quer mais assistir — libera so a conexao daquele canal
+    if (outgoingPCs.has(chave)) {
+      outgoingPCs.get(chave).close();
+      outgoingPCs.delete(chave);
+      filasIceSaida.delete(chave);
     }
   } else if (payload.tipo === 'answer') {
-    const pc = outgoingPCs.get(from);
+    const pc = outgoingPCs.get(chave);
     if (!pc) return;
     await pc.setRemoteDescription(payload.sdp);
-    const fila = filasIceSaida.get(from) || [];
+    const fila = filasIceSaida.get(chave) || [];
     for (const c of fila.splice(0)) {
       try { await pc.addIceCandidate(c); } catch (e) { console.warn(e); }
     }
@@ -1233,18 +1524,15 @@ socket.on('signal', async ({ from, payload }) => {
     // O "papel" vem do ponto de vista de quem MANDOU o candidato: se veio da
     // conexao de SAIDA dele, aqui do meu lado isso pertence a conexao de
     // ENTRADA que eu tenho com essa pessoa (e vice-versa — e a mesma ligacao,
-    // vista de cada lado). Sem essa distincao, quando as duas pessoas
-    // compartilham uma pra outra ao mesmo tempo, existem duas conexoes
-    // independentes com o mesmo peerId, e nao dava pra saber qual das duas
-    // era a dona de cada candidato.
-    const pc = payload.papel === 'saida' ? incomingPCs.get(from) : outgoingPCs.get(from);
+    // vista de cada lado).
+    const pc = payload.papel === 'saida' ? incomingPCs.get(chave) : outgoingPCs.get(chave);
     const filas = payload.papel === 'saida' ? filasIceEntrada : filasIceSaida;
 
     if (pc && pc.remoteDescription) {
       pc.addIceCandidate(payload.candidate).catch((err) => console.warn(err));
     } else {
-      if (!filas.has(from)) filas.set(from, []);
-      filas.get(from).push(payload.candidate);
+      if (!filas.has(chave)) filas.set(chave, []);
+      filas.get(chave).push(payload.candidate);
     }
   }
 });
@@ -1657,7 +1945,11 @@ async function aplicarSaidaEmTodos() {
 }
 
 if (navigator.mediaDevices && 'ondevicechange' in navigator.mediaDevices) {
-  navigator.mediaDevices.addEventListener('devicechange', listarDispositivos);
+  navigator.mediaDevices.addEventListener('devicechange', async () => {
+    await listarDispositivos();
+    await conferirSePodeVirar(); // plugou/tirou uma webcam: o botao de virar acompanha
+    aplicarEspelhoDaCamera();
+  });
 }
 
 selectEntrada.addEventListener('change', async () => {
@@ -1908,8 +2200,14 @@ async function aplicarQualidadeNaConexao(pc, qualidade) {
   }
 }
 
+// Os ajustes de qualidade sao da TELA (bitrate alto por causa de texto pequeno).
+// A camera tem teto proprio e fixo, entao fica de fora — o mesmo cuidado que os
+// ajustes de microfone tem de nao encostar no audio da tela.
 function aplicarQualidadeATodasConexoes(qualidade) {
-  outgoingPCs.forEach((pc) => aplicarQualidadeNaConexao(pc, qualidade));
+  outgoingPCs.forEach((pc, chave) => {
+    if (partesDaChave(chave).canal !== 'tela') return;
+    aplicarQualidadeNaConexao(pc, qualidade);
+  });
   if (estado.localStream) {
     const trackVideo = estado.localStream.getVideoTracks()[0];
     if (trackVideo) {

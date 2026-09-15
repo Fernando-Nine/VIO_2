@@ -729,6 +729,12 @@ button:focus {
   background-color: #000;
 }
 
+/* Camera frontal espelhada: e o que a pessoa espera de uma selfie. Vale SO pra
+   a propria previa — quem assiste recebe a imagem como ela e. */
+#video-remoto.espelhado {
+  transform: scaleX(-1);
+}
+
 /* placeholder */
 .overlay-placeholder {
   position: absolute;
@@ -1133,7 +1139,22 @@ button:focus {
 
 .btn-compartilhar {
   flex: 1;
+  min-width: 0;
   margin-top: 0;
+  padding: 0 16px;
+}
+
+/* Num celular o rodape tem ajustes, microfone, fone e camera antes do botao de
+   compartilhar — nao sobra largura pro texto, e ele sairia cortado. Entao aqui
+   ele e so o icone (o aria-label/title continuam dizendo o que faz) e o rotulo
+   volta quando a tela permite. */
+.btn-compartilhar .rotulo-botao { display: none; }
+
+@media (min-width: 560px) {
+  .btn-compartilhar {
+    padding: 0 24px;
+  }
+  .btn-compartilhar .rotulo-botao { display: inline; }
 }
 
 .btn-compartilhar.compartilhando {

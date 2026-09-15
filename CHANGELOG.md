@@ -7,6 +7,25 @@ segue [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAJOR.MINOR.PA
 O mesmo conteúdo fica disponível dentro do próprio app, tocando no número da versão na
 tela de entrada.
 
+## [1.8.0] - 2026-09-15
+
+### Adicionado
+- Câmera. O botão fica no rodapé, ao lado do microfone, e liga só o vídeo — o
+  microfone continua sendo da conversa por voz, com os ajustes dele.
+- Dá pra estar com a tela e a câmera no ar ao mesmo tempo: as duas aparecem
+  separadas na tira de transmissões, e a da câmera vem marcada como tal.
+- No celular com mais de uma câmera, um botão vira entre a frontal e a traseira
+  sem derrubar quem está assistindo. A frontal aparece espelhada na sua prévia,
+  como numa selfie; quem assiste vê a imagem como ela é.
+- A lista de participantes mostra quem está com a câmera ligada.
+
+### Alterado
+- Como a tela, a câmera é sob demanda: ela só sai do seu computador para quem
+  escolheu vê-la. Diferente da voz, que vai sempre para a sala toda.
+- Em tela estreita, o botão de compartilhar mostra só o ícone. O texto não
+  cabia junto dos botões do rodapé e vinha saindo cortado; ele volta assim que
+  há largura para ele.
+
 ## [1.7.1] - 2026-09-15
 
 ### Corrigido

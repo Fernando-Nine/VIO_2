@@ -30,10 +30,19 @@ Decisão explícita de escopo, não limitação temporária:
 - **Voz** (`vozPCs`) usa conexões **separadas** das de tela — nunca misturar tracks de
   microfone com tracks de tela na mesma PeerConnection. É **uma** conexão por par,
   bidirecional, e **sempre-para-todos** (a tela é sob demanda). Daí o teto de ~6.
-- **`payload.canal`** (`'tela' | 'voz'`) é obrigatório na sinalização: com voz no ar, o mesmo
-  par de pessoas pode ter três conexões, e sem o canal um candidato ICE de voz iria parar
-  numa conexão de tela e a mataria em silêncio. O `papel` separa ida/volta da tela; o `canal`
-  separa tela de voz. Câmera, quando existir, segue o mesmo padrão.
+- **`payload.canal`** (`'tela' | 'voz' | 'camera'`) é obrigatório na sinalização: o mesmo par
+  de pessoas pode ter várias conexões ao mesmo tempo, e sem o canal um candidato ICE de voz
+  iria parar numa conexão de tela e a mataria em silêncio. O `papel` separa ida/volta da
+  tela; o `canal` separa tela, voz e câmera.
+- **Chave composta `"socketId|canal"`** (`chaveDe`/`partesDaChave`): quem transmite tela e
+  câmera ao mesmo tempo precisa de duas conexões, então nada que descreve uma transmissão
+  pode ser indexado só pelo `socket.id`. Vale pra `streamsDisponiveis`, `focoAtual`, PCs e
+  filas de ICE — **menos** a voz, que é uma conexão por par e continua indexada pelo id.
+- **Câmera** (`canal: 'camera'`) segue o desenho da voz — lista própria no servidor
+  (`cameraIds`), conexões separadas —, mas o comportamento da **tela**: sob demanda, só sai
+  pra quem focou nela. Pega **só vídeo**: microfone é do canal de voz. Os ajustes de
+  qualidade são da tela e não valem pra ela (teto próprio, `BITRATE_CAMERA`). Virar
+  frontal/traseira usa `replaceTrack`, nunca renegociação — senão pisca preto em quem assiste.
 - Na malha de voz, **quem tem o `socket.id` menor faz a oferta**; o outro espera. Sem isso as
   duas pontas travam em `have-local-offer`.
 - **Grafo de áudio do microfone:** `fonte → ganhoUsuario → analisador → ganhoPortão → destino`,
@@ -102,7 +111,7 @@ com o mesmo conteúdo: `package.json`, `@CHANGELOG.md` e `@public/changelog.json
 app exibe quando se toca no número da versão) — **[HOOK]**: o commit falha se `version` mudar
 sem os outros dois. O app lê a versão de `/api/version`, servida a partir do `package.json`.
 
-Semver: correção = PATCH, feature nova = MINOR. Versão atual: 1.7.1.
+Semver: correção = PATCH, feature nova = MINOR. Versão atual: 1.8.0.
 
 ## Estrutura de pastas
 
@@ -132,14 +141,13 @@ vio/
 
 ## Roadmap — nesta ordem
 
-1. **Câmera**. Conexões separadas; `canal: 'camera'`; troca frontal/traseira no celular.
-2. **TURN**. Ligado por variável de ambiente, com credenciais efêmeras. Já há um caso
+1. **TURN**. Ligado por variável de ambiente, com credenciais efêmeras. Já há um caso
    confirmado de quem não conecta sem ele (NAT simétrico) — ver `@ESTADO.md`. É o item que
    mais muda a vida de quem hoje simplesmente não consegue usar o VIO.
-3. **Tauri + WASAPI**. Não é "empacotar o front-end": exige captura de áudio por processo em
+2. **Tauri + WASAPI**. Não é "empacotar o front-end": exige captura de áudio por processo em
    Rust e injetar esse áudio na PeerConnection da WebView2. É o item mais caro da lista.
 
-Reconexão (1.3.0), PWA (1.4.0) e chat de voz (1.5.0) saíram daqui — estão implementados.
+Reconexão (1.3.0), PWA (1.4.0), chat de voz (1.5.0) e câmera (1.8.0) saíram daqui — estão implementados.
 
 ## Segurança — pendências já mapeadas
 
