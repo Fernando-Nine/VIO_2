@@ -138,7 +138,7 @@
         </div>
 
         <!-- Botão flutuante de desbloqueio de áudio -->
-        <button id="btn-desbloquear-audio" type="button" class="btn-desbloquear-audio">
+        <button id="btn-desbloquear-audio" type="button" class="btn-desbloquear-audio oculto">
           <span class="icone icone-volume" aria-hidden="true"></span>
           Ativar o som
         </button>
@@ -172,6 +172,9 @@
     <footer class="rodape-sala">
       <button id="btn-ajustes" type="button" class="btn-icone" aria-label="Ajustes">
         <span class="icone icone-settings" aria-hidden="true"></span>
+      </button>
+      <button id="btn-microfone" type="button" class="btn-icone" aria-pressed="false" aria-label="Entrar na conversa por voz" title="Entrar na conversa por voz">
+        <span id="icone-microfone" class="icone icone-microphone-slash" aria-hidden="true"></span>
       </button>
       <button id="btn-compartilhar" type="button" class="btn-primario btn-compartilhar">
         <span class="icone icone-computer" aria-hidden="true"></span>
@@ -219,11 +222,14 @@
     <span class="alca" aria-hidden="true"></span>
     <header class="cabecalho-folha">
       <h2 id="titulo-participantes" class="titulo-folha">Quem está na sala</h2>
+      <button id="btn-limite-sala" type="button" class="btn-ajuda" aria-label="Por que existe um limite de pessoas?"
+              title="O VIO conecta todo mundo direto, sem servidor no meio do áudio e do vídeo. Isso mantém a sala privada e barata, mas cada pessoa precisa manter uma conexão com cada uma das outras — o custo cresce rápido. Acima de ~6 pessoas na conversa por voz, a coisa começa a engasgar.">?</button>
       <button id="btn-fechar-participantes" type="button" class="btn-fechar-folha" aria-label="Fechar">
         <span class="icone icone-cross" aria-hidden="true"></span>
       </button>
     </header>
     <div class="corpo-folha">
+      <div id="medidor-voz-local" class="medidor-voz oculto" role="img" aria-label="Nível do seu microfone"></div>
       <ul id="lista-participantes" class="lista-participantes"></ul>
     </div>
   </aside>

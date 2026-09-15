@@ -1,5 +1,16 @@
 [
   {
+    "versao": "1.5.0",
+    "data": "2026-09-15",
+    "mudancas": [
+      { "tipo": "adicionado", "texto": "Conversa por voz na sala. O botão de microfone no rodapé entra na conversa; tocando de novo você fica mudo, mas continua ouvindo todo mundo." },
+      { "tipo": "adicionado", "texto": "O avatar de quem está falando ganha um anel, e a folha \"Quem está na sala\" mostra o nível do seu próprio microfone — dá pra conferir se ele está pegando." },
+      { "tipo": "adicionado", "texto": "Um \"?\" ao lado de \"Quem está na sala\" explica por que existe um limite de pessoas por sala." },
+      { "tipo": "alterado", "texto": "O teal deixa de ser exclusivo do status \"ao vivo\" e passa a significar \"acontecendo agora\": vale também para quem está falando." },
+      { "tipo": "corrigido", "texto": "O botão \"Ativar o som\" aparecia o tempo todo desde a 1.4.0, mesmo sem nada para desbloquear. Agora só aparece quando o navegador realmente segurou o áudio — e destrava tanto o vídeo quanto as vozes da conversa." }
+    ]
+  },
+  {
     "versao": "1.4.0",
     "data": "2026-09-15",
     "mudancas": [

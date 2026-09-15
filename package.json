@@ -1,6 +1,6 @@
 {
   "name": "vio",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Compartilhamento de tela P2P para assistir conteudo com amigos, com controle de qualidade/FPS e roteamento de audio.",
   "main": "server.js",
   "license": "AGPL-3.0-or-later",

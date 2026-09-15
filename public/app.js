@@ -28,6 +28,10 @@ const PALAVRAS_SALA = ['PIPOCA', 'SESSAO', 'BUTECO', 'MARATONA', 'CINEMINHA', 'R
 
 const DURACAO_INATIVIDADE_MS = 3000;
 
+// Acima disso o avatar ganha o anel de "falando". Baixo o bastante pra pegar voz
+// normal, alto o bastante pra nao piscar com ruido de fundo.
+const LIMIAR_FALANDO = 8;
+
 // ---------------------------------------------------------------------------
 // Referencias DOM
 // ---------------------------------------------------------------------------
@@ -67,7 +71,10 @@ const iconePrevia = document.getElementById('icone-previa');
 const btnTelaCheia = document.getElementById('btn-tela-cheia');
 
 const btnAjustes = document.getElementById('btn-ajustes');
+const btnMicrofone = document.getElementById('btn-microfone');
+const iconeMicrofone = document.getElementById('icone-microfone');
 const btnCompartilhar = document.getElementById('btn-compartilhar');
+const medidorVozLocal = document.getElementById('medidor-voz-local');
 
 // folhas (bottom sheets)
 const cobertura = document.getElementById('cobertura');
@@ -87,6 +94,7 @@ const listaChangelog = document.getElementById('lista-changelog');
 
 const painelParticipantes = document.getElementById('painel-participantes');
 const btnFecharParticipantes = document.getElementById('btn-fechar-participantes');
+const btnLimiteSala = document.getElementById('btn-limite-sala');
 const listaParticipantes = document.getElementById('lista-participantes');
 
 const painelAvancado = document.getElementById('painel-avancado');
@@ -122,12 +130,23 @@ const estado = {
   focoAtual: null, // id de quem estou vendo no momento (pode ser o meu proprio)
   localStream: null, // meu stream de captura, se eu estiver compartilhando
   streamPendente: null, // stream capturado aguardando confirmacao do servidor
+  voiceIds: new Set(), // quem esta no canal de voz (pode me incluir)
+  vozStream: null, // meu microfone, se eu estiver na voz
+  vozMudo: false, // mudo local: a conexao continua, a track e que para de mandar
 };
 
 const outgoingPCs = new Map(); // peerId -> RTCPeerConnection (uso pra cada pessoa que assiste MEU compartilhamento)
 const filasIceSaida = new Map(); // peerId -> candidatos ICE recebidos antes da hora (lado de saida)
 const incomingPCs = new Map(); // peerId -> RTCPeerConnection (uma por transmissao que estou recebendo)
 const filasIceEntrada = new Map(); // peerId -> candidatos ICE recebidos antes da hora (lado de entrada)
+
+// Voz: UMA conexao por par, bidirecional — diferente da tela, que tem uma de ida
+// e outra de volta. Por isso aqui nao existe "papel": vozPCs.get(from) ja e unico.
+const vozPCs = new Map(); // peerId -> RTCPeerConnection (voz)
+const filasIceVoz = new Map();
+const audiosVoz = new Map(); // peerId -> <audio> que toca a voz dessa pessoa
+const analisadoresVoz = new Map(); // peerId -> medidor de nivel, pra saber quem esta falando
+const niveisVoz = new Map(); // peerId -> 0..100 (sobrevive ao re-render da lista)
 let previaVisivel = true; // so importa quando o foco atual sou eu mesmo
 let qualidadeAtualPreset = 'media'; // 'alta' | 'media' | 'baixa' | null (null = personalizada)
 
@@ -166,12 +185,13 @@ function mostrarAlerta(texto, duracaoMs = 3600) {
   alertaTimeout = setTimeout(() => alertaEl.classList.add('oculto'), duracaoMs);
 }
 
-function criarConexao() {
+function criarConexao(canal = 'tela') {
   const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
   pc.oniceconnectionstatechange = () => {
-    console.log('[VIO] estado da conexão:', pc.iceConnectionState);
+    console.log(`[VIO] estado da conexão (${canal}):`, pc.iceConnectionState);
     if (pc.iceConnectionState === 'failed') {
-      mostrarAlerta('Não foi possível conectar com uma das transmissões — geralmente é a rede de alguém na sala bloqueando a conexão direta. Tenta atualizar a página.', 6500);
+      const alvo = canal === 'voz' ? 'o áudio de alguém da sala' : 'uma das transmissões';
+      mostrarAlerta(`Não foi possível conectar com ${alvo} — geralmente é a rede de alguém na sala bloqueando a conexão direta. Tenta atualizar a página.`, 6500);
     }
   };
   return pc;
@@ -403,6 +423,8 @@ btnSairSala.addEventListener('click', () => {
   clearTimeout(timerReentrada);
 
   if (estado.sharingIds.has(socket.id)) pararCompartilhamento();
+  if (estado.voiceIds.has(socket.id)) socket.emit('stop-voice');
+  largarVoz();
   incomingPCs.forEach((pc) => pc.close());
   incomingPCs.clear();
   filasIceEntrada.clear();
@@ -460,10 +482,26 @@ function renderizarParticipantes() {
 
   const criarItem = (id, nome, souEu) => {
     const item = document.createElement('li');
+    item.dataset.id = id; // o loop de nivel de voz acha o avatar por aqui
     const esquerda = document.createElement('span');
     esquerda.className = 'nome-participante';
     esquerda.innerHTML = `<span class="avatar-participante" aria-hidden="true">${iniciaisDoNome(nome)}</span><span>${escapeHtml(nome)}</span>`;
     if (souEu) esquerda.innerHTML += ' <span class="etiqueta-voce">(você)</span>';
+
+    if (estado.voiceIds.has(id)) {
+      // De quem nao sou eu so da pra saber que esta na voz — mudo remoto nao e
+      // sinalizado. Quem esta falando aparece pelo anel no avatar.
+      const mudo = souEu && estado.vozMudo;
+      const mic = document.createElement('span');
+      mic.className = `icone ${mudo ? 'icone-microphone-slash' : 'icone-microphone'}`;
+      mic.setAttribute('aria-label', mudo ? 'microfone desligado' : 'na conversa');
+      esquerda.appendChild(mic);
+    }
+
+    // reaplica o anel de "falando": innerHTML acabou de apagar o estado anterior
+    const avatar = esquerda.querySelector('.avatar-participante');
+    if (avatar && (niveisVoz.get(id) || 0) > LIMIAR_FALANDO) avatar.classList.add('falando');
+
     item.appendChild(esquerda);
     if (estado.sharingIds.has(id)) {
       const badge = document.createElement('span');
@@ -493,15 +531,17 @@ function atualizarBotaoCompartilhar() {
   btnCompartilhar.disabled = false; // varias pessoas podem compartilhar ao mesmo tempo, entao nunca trava por causa de outra
 }
 
-socket.on('room-state', ({ participants, sharingIds, criadaEm }) => {
+socket.on('room-state', ({ participants, sharingIds, voiceIds, criadaEm }) => {
   estado.participantes.clear();
   participants.forEach((p) => {
     if (p.id !== socket.id) estado.participantes.set(p.id, p.name);
   });
   estado.sharingIds = new Set(sharingIds);
+  estado.voiceIds = new Set(voiceIds || []);
   estado.salaCriadaEm = criadaEm;
   renderizarParticipantes();
   atualizarBotaoCompartilhar();
+  atualizarBotaoMicrofone();
 
   const acabeiDeVoltar = reconectando;
   if (acabeiDeVoltar) {
@@ -513,7 +553,15 @@ socket.on('room-state', ({ participants, sharingIds, criadaEm }) => {
     // Se a tela ainda esta capturada, volto a anunciar que estou compartilhando:
     // o stream nunca parou, so as conexoes precisam renascer.
     if (estado.localStream) socket.emit('start-share');
+    // Mesma logica pro microfone: ele sobrevive a queda, so as conexoes morrem.
+    // O medidor precisa ser religado porque era indexado pelo socket.id antigo.
+    if (estado.vozStream) {
+      monitorarNivel(socket.id, estado.vozStream);
+      socket.emit('start-voice');
+    }
   }
+
+  sincronizarConexoesVoz();
 
   if (estado.sharingIds.size > 0) focarEm([...estado.sharingIds][0]); // ja tem gente compartilhando - foca na primeira automaticamente
   else if (acabeiDeVoltar && !estado.localStream) resetarMoldura(); // tira o aviso de "Reconectando..."
@@ -530,6 +578,7 @@ socket.on('participant-joined', ({ id, name }) => {
 socket.on('participant-left', ({ id }) => {
   const nome = estado.participantes.get(id);
   estado.participantes.delete(id);
+  estado.voiceIds.delete(id);
   renderizarParticipantes();
   if (nome) mostrarAlerta(`${nome} saiu da sala.`);
 
@@ -538,6 +587,7 @@ socket.on('participant-left', ({ id }) => {
     outgoingPCs.delete(id);
     filasIceSaida.delete(id);
   }
+  encerrarConexaoVoz(id);
 });
 
 // ---------------------------------------------------------------------------
@@ -567,12 +617,18 @@ function descartarConexoes() {
   incomingPCs.forEach((pc) => pc.close());
   incomingPCs.clear();
   filasIceEntrada.clear();
+  // A voz cai junto: os peerIds sao socket ids, e todos mudaram. O microfone
+  // em si (estado.vozStream) sobrevive, como o localStream da tela.
+  [...vozPCs.keys()].forEach(encerrarConexaoVoz);
+  pararLoopNivel();
+  analisadoresVoz.clear(); // inclusive o meu: meu socket.id tambem mudou
 }
 
 function reentrarNaSala() {
   descartarConexoes();
   estado.participantes.clear();
   estado.sharingIds.clear();
+  estado.voiceIds.clear();
   estado.streamsDisponiveis.clear();
   estado.focoAtual = null;
 
@@ -841,7 +897,10 @@ function atualizarIconeVolume() {
 }
 
 btnDesbloquearAudio.addEventListener('click', () => {
-  videoRemoto.play();
+  // Destrava os dois: o video da tela e as vozes da conversa. Sao elementos
+  // diferentes, e o navegador pode ter segurado qualquer um deles.
+  videoRemoto.play().catch(() => {});
+  audiosVoz.forEach((el) => el.play().catch(() => {}));
   btnDesbloquearAudio.classList.add('oculto');
 });
 
@@ -1078,6 +1137,15 @@ socket.on('share-stopped', ({ id }) => {
 // ---------------------------------------------------------------------------
 
 socket.on('signal', async ({ from, payload }) => {
+  // Com voz no ar, o MESMO par de pessoas pode ter tres conexoes: minha tela pra
+  // voce, sua tela pra mim, e a voz. O "papel" ja separava as duas primeiras; o
+  // "canal" separa a terceira. Sem isso um candidato ICE de voz acabaria
+  // entregue a uma conexao de tela, que morreria em silencio.
+  if (payload.canal === 'voz') {
+    await tratarSinalVoz(from, payload);
+    return;
+  }
+
   if (payload.tipo === 'offer') {
     const pc = criarConexao();
     incomingPCs.set(from, pc);
@@ -1142,6 +1210,308 @@ socket.on('signal', async ({ from, payload }) => {
       filas.get(from).push(payload.candidate);
     }
   }
+});
+
+// ---------------------------------------------------------------------------
+// Chat de voz
+//
+// Tres diferencas em relacao a tela, todas de proposito:
+//
+// 1. Conexoes SEPARADAS. Track de microfone nunca entra numa PeerConnection de
+//    tela. Sao midias com ciclo de vida e qualidade diferentes.
+// 2. Sempre-para-todos, nao sob demanda. Quem esta na voz conecta com todo mundo
+//    que esta na voz — e dai que vem o teto de ~6 pessoas: as conexoes crescem
+//    com N*(N-1)/2 e existem o tempo todo, mesmo sem ninguem compartilhando.
+// 3. Microfone com processamento LIGADO (eco, ruido, ganho). E o oposto exato da
+//    regra do audio de tela, porque aqui e voz — o caso pra que esses
+//    processamentos foram inventados.
+//
+// Como e uma malha, os dois lados querem ligar ao mesmo tempo. Quem faz a oferta
+// e quem tem o socket.id menor; o outro espera. Sem isso as duas pontas ficariam
+// preas em have-local-offer.
+// ---------------------------------------------------------------------------
+
+function enviarVoz(peerId, payload) {
+  socket.emit('signal', { to: peerId, payload: { ...payload, canal: 'voz' } });
+}
+
+function devoIniciarCom(peerId) {
+  return String(socket.id) < String(peerId);
+}
+
+function criarConexaoVoz(peerId) {
+  const existente = vozPCs.get(peerId);
+  if (existente) return existente;
+
+  const pc = criarConexao('voz');
+  vozPCs.set(peerId, pc);
+
+  if (estado.vozStream) {
+    estado.vozStream.getTracks().forEach((track) => pc.addTrack(track, estado.vozStream));
+  }
+
+  pc.onicecandidate = (e) => {
+    if (e.candidate) enviarVoz(peerId, { tipo: 'ice', candidate: e.candidate });
+  };
+
+  pc.ontrack = (e) => {
+    reproduzirVoz(peerId, e.streams[0]);
+    monitorarNivel(peerId, e.streams[0]);
+  };
+
+  return pc;
+}
+
+async function iniciarConexaoVoz(peerId) {
+  const pc = criarConexaoVoz(peerId);
+  const oferta = await pc.createOffer();
+  await pc.setLocalDescription(oferta);
+  enviarVoz(peerId, { tipo: 'offer', sdp: pc.localDescription });
+}
+
+function encerrarConexaoVoz(peerId) {
+  const pc = vozPCs.get(peerId);
+  if (pc) pc.close();
+  vozPCs.delete(peerId);
+  filasIceVoz.delete(peerId);
+  analisadoresVoz.delete(peerId);
+  niveisVoz.delete(peerId);
+
+  const el = audiosVoz.get(peerId);
+  if (el) {
+    el.srcObject = null;
+    el.remove();
+    audiosVoz.delete(peerId);
+  }
+}
+
+// Reconcilia as conexoes de voz com quem esta no canal. Chamada sempre que a
+// lista muda (entrou, saiu, eu entrei, eu sai, reconectei).
+function sincronizarConexoesVoz() {
+  const euEstou = estado.voiceIds.has(socket.id);
+
+  if (!euEstou) {
+    [...vozPCs.keys()].forEach(encerrarConexaoVoz);
+    pararLoopNivel();
+    return;
+  }
+
+  vozPCs.forEach((_, id) => {
+    if (!estado.voiceIds.has(id)) encerrarConexaoVoz(id);
+  });
+
+  estado.voiceIds.forEach((id) => {
+    if (id === socket.id || vozPCs.has(id)) return;
+    if (devoIniciarCom(id)) iniciarConexaoVoz(id);
+    // senao: fico esperando a oferta dele, pra nao haver oferta cruzada
+  });
+
+  iniciarLoopNivel();
+}
+
+async function tratarSinalVoz(from, payload) {
+  if (payload.tipo === 'offer') {
+    const pc = criarConexaoVoz(from);
+    await pc.setRemoteDescription(payload.sdp);
+    const fila = filasIceVoz.get(from) || [];
+    for (const c of fila.splice(0)) {
+      try { await pc.addIceCandidate(c); } catch (e) { console.warn(e); }
+    }
+    const resposta = await pc.createAnswer();
+    await pc.setLocalDescription(resposta);
+    enviarVoz(from, { tipo: 'answer', sdp: pc.localDescription });
+  } else if (payload.tipo === 'answer') {
+    const pc = vozPCs.get(from);
+    if (!pc) return;
+    await pc.setRemoteDescription(payload.sdp);
+    const fila = filasIceVoz.get(from) || [];
+    for (const c of fila.splice(0)) {
+      try { await pc.addIceCandidate(c); } catch (e) { console.warn(e); }
+    }
+  } else if (payload.tipo === 'ice') {
+    const pc = vozPCs.get(from);
+    if (pc && pc.remoteDescription) {
+      pc.addIceCandidate(payload.candidate).catch((err) => console.warn(err));
+    } else {
+      if (!filasIceVoz.has(from)) filasIceVoz.set(from, []);
+      filasIceVoz.get(from).push(payload.candidate);
+    }
+  }
+}
+
+// ---- microfone ----
+
+async function ligarMicrofone() {
+  if (estado.vozStream) return true;
+  try {
+    estado.vozStream = await navigator.mediaDevices.getUserMedia({
+      // LIGADOS de proposito — o oposto do audio de tela. Aqui e voz de
+      // microfone, exatamente o caso pra que esses processamentos existem.
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      video: false,
+    });
+    monitorarNivel(socket.id, estado.vozStream);
+    return true;
+  } catch (erro) {
+    if (erro.name === 'NotAllowedError') {
+      mostrarAlerta('Pra entrar na conversa, precisa liberar o microfone no navegador.', 5500);
+    } else {
+      mostrarAlerta('Não consegui acessar o microfone: ' + erro.message, 5500);
+    }
+    return false;
+  }
+}
+
+async function entrarNaVoz() {
+  if (!(await ligarMicrofone())) return;
+  estado.vozMudo = false;
+  aplicarMudo();
+  socket.emit('start-voice');
+}
+
+function aplicarMudo() {
+  if (!estado.vozStream) return;
+  estado.vozStream.getAudioTracks().forEach((t) => { t.enabled = !estado.vozMudo; });
+  if (estado.vozMudo) definirNivel(socket.id, 0);
+}
+
+function alternarMicrofone() {
+  if (!estado.voiceIds.has(socket.id)) {
+    entrarNaVoz();
+    return;
+  }
+  // Ja estou na voz: o botao vira mudo. A conexao continua viva, entao eu
+  // continuo ouvindo todo mundo — so paro de mandar.
+  estado.vozMudo = !estado.vozMudo;
+  aplicarMudo();
+  atualizarBotaoMicrofone();
+  mostrarAlerta(estado.vozMudo ? 'Microfone desligado. Você continua ouvindo.' : 'Microfone ligado.');
+}
+
+function atualizarBotaoMicrofone() {
+  const naVoz = estado.voiceIds.has(socket.id);
+  const mandando = naVoz && !estado.vozMudo;
+
+  iconeMicrofone.classList.toggle('icone-microphone', mandando);
+  iconeMicrofone.classList.toggle('icone-microphone-slash', !mandando);
+  btnMicrofone.classList.toggle('ativo', mandando);
+  btnMicrofone.setAttribute('aria-pressed', String(mandando));
+  btnMicrofone.setAttribute(
+    'aria-label',
+    !naVoz ? 'Entrar na conversa por voz' : (mandando ? 'Desligar o microfone' : 'Ligar o microfone')
+  );
+  btnMicrofone.title = btnMicrofone.getAttribute('aria-label');
+
+  if (medidorVozLocal) medidorVozLocal.classList.toggle('oculto', !naVoz);
+}
+
+// No desktop o title ja aparece sozinho no hover; no toque nao existe hover,
+// entao o mesmo texto vira alerta.
+btnLimiteSala.addEventListener('click', () => {
+  mostrarAlerta(btnLimiteSala.title, 9000);
+});
+
+// ---- reproducao e medicao de nivel ----
+
+function reproduzirVoz(peerId, stream) {
+  let el = audiosVoz.get(peerId);
+  if (!el) {
+    el = document.createElement('audio');
+    el.autoplay = true;
+    el.playsInline = true;
+    el.dataset.peer = peerId;
+    audiosVoz.set(peerId, el);
+    document.body.appendChild(el);
+  }
+  if (el.srcObject !== stream) el.srcObject = stream;
+  el.play().catch(() => {
+    // navegador segurando o audio ate um gesto: o proprio botao de microfone
+    // ja e um gesto, entao na pratica isso quase nao acontece
+    btnDesbloquearAudio.classList.remove('oculto');
+  });
+}
+
+function monitorarNivel(peerId, stream) {
+  const ctx = obterAudioCtxUI();
+  if (!ctx || analisadoresVoz.has(peerId)) return;
+  try {
+    const analisador = ctx.createAnalyser();
+    analisador.fftSize = 512;
+    analisador.smoothingTimeConstant = 0.6;
+    ctx.createMediaStreamSource(stream).connect(analisador);
+    // de proposito NAO conectamos ao destination: quem toca o som e o <audio>.
+    analisadoresVoz.set(peerId, { analisador, dados: new Uint8Array(analisador.fftSize) });
+  } catch (erro) {
+    console.warn('[VIO] nao deu pra medir o nivel de voz:', erro.message);
+  }
+}
+
+function definirNivel(peerId, nivel) {
+  niveisVoz.set(peerId, nivel);
+
+  const item = listaParticipantes.querySelector(`li[data-id="${CSS.escape(peerId)}"] .avatar-participante`);
+  if (item) item.classList.toggle('falando', nivel > LIMIAR_FALANDO);
+
+  if (peerId === socket.id && medidorVozLocal) {
+    medidorVozLocal.style.setProperty('--nivel', nivel);
+  }
+}
+
+let rafNivel = null;
+
+function loopNivelVoz() {
+  analisadoresVoz.forEach(({ analisador, dados }, peerId) => {
+    analisador.getByteTimeDomainData(dados);
+    let soma = 0;
+    for (let i = 0; i < dados.length; i += 1) {
+      const v = (dados[i] - 128) / 128;
+      soma += v * v;
+    }
+    const rms = Math.sqrt(soma / dados.length);
+    definirNivel(peerId, Math.min(100, Math.round(rms * 400)));
+  });
+  rafNivel = requestAnimationFrame(loopNivelVoz);
+}
+
+function iniciarLoopNivel() {
+  if (rafNivel === null) rafNivel = requestAnimationFrame(loopNivelVoz);
+}
+
+function pararLoopNivel() {
+  if (rafNivel !== null) cancelAnimationFrame(rafNivel);
+  rafNivel = null;
+  niveisVoz.clear();
+  if (medidorVozLocal) medidorVozLocal.style.setProperty('--nivel', 0);
+}
+
+function largarVoz() {
+  [...vozPCs.keys()].forEach(encerrarConexaoVoz);
+  pararLoopNivel();
+  analisadoresVoz.clear();
+  if (estado.vozStream) {
+    estado.vozStream.getTracks().forEach((t) => t.stop());
+    estado.vozStream = null;
+  }
+  estado.vozMudo = false;
+  estado.voiceIds.clear();
+}
+
+btnMicrofone.addEventListener('click', alternarMicrofone);
+
+socket.on('voice-started', ({ id }) => {
+  estado.voiceIds.add(id);
+  if (id !== socket.id) mostrarAlerta(`${nomeDoParticipante(id)} entrou na conversa.`);
+  renderizarParticipantes();
+  atualizarBotaoMicrofone();
+  sincronizarConexoesVoz();
+});
+
+socket.on('voice-stopped', ({ id }) => {
+  if (!estado.voiceIds.has(id)) return;
+  estado.voiceIds.delete(id);
+  renderizarParticipantes();
+  atualizarBotaoMicrofone();
+  sincronizarConexoesVoz();
 });
 
 // ---------------------------------------------------------------------------

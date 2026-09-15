@@ -3,7 +3,7 @@
 Arquivo vivo. O `CLAUDE.md` guarda as regras permanentes (e fica curto de propósito); **este
 guarda onde estamos**. Substitui o antigo `ESTADO-DO-PROJETO.md`, que ficou desatualizado.
 
-Última atualização: **15/09/2026** · Versão do app: **1.4.0**
+Última atualização: **15/09/2026** · Versão do app: **1.5.0**
 
 ---
 
@@ -61,6 +61,28 @@ chama `skipWaiting()`, para não trocar código por baixo de quem está comparti
 > `http://` num IP da rede local — o teste pelo Radmin — o navegador não registra, e o app roda
 > igual, só sem instalar. Não é defeito: para ver a instalação funcionando é preciso HTTPS.
 
+**Chat de voz** (1.5.0) — botão de microfone no rodapé. Primeiro toque entra na conversa;
+os seguintes alternam mudo, **sem derrubar a conexão** — você continua ouvindo todo mundo.
+Microfone com `echoCancellation`, `noiseSuppression` e `autoGainControl` **ligados**, o oposto
+exato da regra do áudio de tela, e de propósito: aqui é voz.
+
+Uma conexão por par, bidirecional, separada das de tela. Quem tem o `socket.id` menor faz a
+oferta — sem isso as duas pontas travavam em `have-local-offer`. O `payload.canal` distingue
+voz de tela na sinalização: com os dois no ar, o mesmo par pode ter três conexões, e um
+candidato ICE entregue à conexão errada a mataria em silêncio.
+
+Anel no avatar de quem fala (`.falando`) e medidor do próprio microfone na folha de
+participantes, ambos alimentados por um `AnalyserNode` por stream.
+
+> **Sem "sair da voz" ainda.** Uma vez na conversa, você fica até sair da sala. Mudo resolve o
+> caso comum (tossir, atender alguém) e mantém você ouvindo; sair de vez não tem botão. Se
+> incomodar, é fácil de acrescentar.
+
+> **Eco com áudio de tela.** Quem compartilha tela **com som** e está na voz vai ter o
+> microfone captando esse som pelas caixas. O cancelamento de eco ajuda, mas não resolve com
+> mídia alta — a resposta é fone de ouvido. É por isso que os ícones `headphones` e
+> `noise-cancelling-headphones` estão baixados.
+
 **Reconexão** (1.3.0) — queda de rede ou restart do servidor: o cliente volta sozinho para a
 sala, sem F5. O `socket.id` muda na volta, então todos os mapas indexados por id são refeitos
 do zero a partir do `room-state`. Quem estava compartilhando volta compartilhando — o
@@ -78,16 +100,14 @@ changelog dentro do app; AGPLv3.
 
 ## 3. O que NÃO existe (apesar de discutido)
 
-- **Chat de voz** — foi desenhado em detalhe e chegou a existir um `voz.js` numa sessão que se
-  perdeu antes de salvar. O código não existe. Os ícones já estão baixados em `public/icons/`
-  (`microphone`, `microphone-slash`, `headphones`, `noise-cancelling-headphones`).
 - **Câmera** — só a decisão de arquitetura (conexões separadas das de tela). Zero código.
+  Segue o mesmo padrão da voz: `canal: 'camera'` na sinalização.
 - **TURN** — discutido a fundo (relay de último recurso, credenciais efêmeras, ligar por
   variável de ambiente), nada implementado. Só STUN do Google hoje.
   **Sintoma já confirmado na prática:** um amigo não consegue ver a tela de ninguém, enquanto a
-  maioria vê normal. É a assinatura de NAT simétrico — STUN não atravessa, só TURN. Continua na
-  posição 5 do roadmap por decisão, mas vale saber que para essa pessoa o VIO não funciona hoje,
-  e nenhuma das features 1 a 4 muda isso.
+  maioria vê normal. É a assinatura de NAT simétrico — STUN não atravessa, só TURN. Agora é o
+  item **2** do roadmap, e com voz no ar ele pesa mais: a voz é sempre-para-todos, então cada
+  par que não consegue conexão direta vira um "eu escuto todo mundo menos o Fulano".
 - **Tauri + WASAPI** — 100% planejamento. Nenhum projeto Tauri criado.
 - **Segurança pendente** — Helmet.js, validação formal de payload do Socket.IO, log
   estruturado, hash de senha (se um dia existir conta).
@@ -98,7 +118,19 @@ changelog dentro do app; AGPLv3.
   sem SFU. A malha P2P completa não escala além disso, e voz é sempre-para-todos (diferente da
   tela, que é sob demanda). Sem essa linha, cada feature nova parecia justificada.
 - **Ordem do roadmap:** reconexão → PWA → voz → câmera → TURN → Tauri. O redesenho visual anda
-  em paralelo, porque toca arquivos diferentes.
+  em paralelo, porque toca arquivos diferentes. Reconexão, PWA e voz já saíram.
+- **SFU reconsiderado e recusado por ora (15/09/2026).** Um SFU levantaria o teto de ~6 para
+  dezenas, e a objeção não é técnica — é que ele **roteia mídia pelo servidor**, exatamente o
+  que a primeira linha do `CLAUDE.md` e o README negam ("o vídeo e o áudio nunca passam por
+  nenhum servidor"). Isso deixa de ser detalhe de implementação e vira outra promessa ao
+  usuário. Três consequências concretas: o servidor passa a **ver** a mídia, o que muda o que
+  dá pra prometer sobre privacidade; hospedagem gratuita deixa de servir, porque um SFU com 6
+  pessoas em 2,5 Mbps recebe ~15 Mbps e reenvia ~75 Mbps contínuos, o que nenhum plano free
+  aguenta; e auto-hospedar o VIO — que é o ponto da AGPLv3 — deixa de ser "rode um Node" e
+  vira operar infraestrutura de mídia. **Decisão:** fica registrado como caminho possível,
+  não descartado, para o dia em que houver orçamento. Até lá o teto continua, agora explicado
+  ao usuário pelo "?" na folha de participantes. O **TURN** (item 2) não tem esse problema:
+  relay de rede, não de aplicação, e o próprio `CLAUDE.md` já o admite como exceção.
 - **"Instalável" = PWA primeiro** (celular e PC), Tauri depois e só pelo WASAPI. Tauri não é
   "empacotar o front-end": exige captura de áudio por processo em Rust e injetar esse áudio na
   PeerConnection da WebView2.

@@ -1781,3 +1781,43 @@ button:focus {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ============================================================
+   Botão de ajuda ("?") — explica o teto de pessoas da sala.
+   O texto vive no title: aparece no hover do desktop, e no toque
+   o app.js mostra o mesmo texto como alerta.
+   ============================================================ */
+.btn-ajuda {
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  margin-right: 8px;
+  border: 1px solid var(--borda-forte);
+  border-radius: var(--raio-full);
+  background: transparent;
+  color: var(--texto-fraco);
+  font: 600 13px/1 inherit;
+  cursor: pointer;
+  flex: none;
+}
+
+.btn-ajuda:hover,
+.btn-ajuda:focus-visible {
+  color: var(--texto);
+  border-color: var(--borda-marca);
+}
+
+/* O medidor fica acima da lista, com respiro, só enquanto há voz. */
+.corpo-folha > .medidor-voz {
+  margin-bottom: 14px;
+}
+
+/* Marcador de "está na conversa por voz" na lista de participantes.
+   Discreto: quem está falando aparece pelo anel no avatar, não por aqui. */
+.nome-participante > .icone {
+  width: 15px;
+  height: 15px;
+  margin-left: 8px;
+  vertical-align: -2px;
+  opacity: 0.65;
+}

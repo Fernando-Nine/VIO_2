@@ -7,6 +7,25 @@ segue [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAJOR.MINOR.PA
 O mesmo conteúdo fica disponível dentro do próprio app, tocando no número da versão na
 tela de entrada.
 
+## [1.5.0] - 2026-09-15
+
+### Adicionado
+- Conversa por voz na sala. O botão de microfone no rodapé entra na conversa;
+  tocando de novo você fica mudo, mas continua ouvindo todo mundo.
+- O avatar de quem está falando ganha um anel, e a folha "Quem está na sala"
+  mostra o nível do seu próprio microfone — dá pra conferir se ele está pegando.
+- Um "?" ao lado de "Quem está na sala" explica por que existe um limite de
+  pessoas por sala.
+
+### Alterado
+- O teal deixa de ser exclusivo do status "ao vivo" e passa a significar
+  "acontecendo agora": vale também para quem está falando.
+
+### Corrigido
+- O botão "Ativar o som" aparecia o tempo todo desde a 1.4.0, mesmo sem nada
+  para desbloquear. Agora só aparece quando o navegador realmente segurou o
+  áudio — e destrava tanto o vídeo quanto as vozes da conversa.
+
 ## [1.4.0] - 2026-09-15
 
 ### Adicionado
