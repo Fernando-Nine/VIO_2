@@ -57,8 +57,9 @@ de fechar qualquer tarefa que toque em mídia:
 ## Fora de limite
 
 Regras **[HOOK]** são cumpridas por `@.claude/hooks/guard.js`, não por adesão a este texto.
-Texto aqui é pedido; hook é portão. Foi a falta deles que deixou um export inteiro do V0 entrar
-no repositório por um `git add .`.
+Texto aqui é pedido; hook é portão. O caso do V0 mostra a diferença: o export **deve** ficar na
+pasta, é a referência visual de onde o redesenho sai — o que não pode é ele ser commitado junto
+num `git add .`. O hook separa as duas coisas sem depender de ninguém lembrar.
 
 - **[HOOK]** Nunca adicionar dependência npm sem aprovação explícita.
 - **[HOOK]** Nunca commitar `.env`, credencial de TURN ou qualquer segredo.

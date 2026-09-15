@@ -22,9 +22,10 @@ Repositório canônico: **GitHub** — `Fernando-Nine/VIO_2`, e desde 15/09/2026
 o projeto (antes tinha só o README). A pasta local em `Documents\Nerd_Quest\VIO` é uma cópia e
 **não** deve ser a pasta de trabalho. Clonar o repo e trabalhar dentro do clone.
 
-> **Aviso do Radmin:** dentro da VPN todo mundo fica na mesma rede virtual, então a travessia de
-> NAT não é exercitada. Um teste que passa pelo Radmin **não** prova que passa pela internet
-> aberta — é justamente o caso do amigo que não consegue ver a tela (ver seção 3, TURN).
+> **Escopo do teste via Radmin:** validar a interface e o fluxo com outra pessoa de verdade,
+> antes de pensar em hospedagem. Travessia de NAT fica de fora por construção — dentro da VPN
+> todos estão na mesma rede virtual —, e isso é deliberado, não uma lacuna do teste. O caso do
+> amigo que não vê a tela só se reproduz pela internet aberta (ver seção 3, TURN).
 
 ## 2. O que existe e funciona
 
@@ -117,6 +118,8 @@ changelog dentro do app; AGPLv3.
   `public/icons/`. Mantido o conjunto atual — o `settings.svg` do V0 não é uma engrenagem, e o
   `CLAUDE.md` proíbe mexer em `public/icons/` sem pedido. Só foram **acrescentados** os cinco
   que não tinham equivalente: `clock`, `link`, `rocket`, `tela-cheia`, `voltar`.
+  Revisado e confirmado: o conjunto do Flaticon fica. A chave e o brilho do V0 foram os dois
+  que mais destoaram.
 - Versão publicada com o redesenho: ainda nenhuma (roda só em localhost).
 
 **Pendente desta rodada:** a checklist de teste manual do `CLAUDE.md` (duas abas, PC + celular,
