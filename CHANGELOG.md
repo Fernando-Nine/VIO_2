@@ -7,6 +7,14 @@ segue [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAJOR.MINOR.PA
 O mesmo conteúdo fica disponível dentro do próprio app, tocando no número da versão na
 tela de entrada.
 
+## [1.7.1] - 2026-09-15
+
+### Corrigido
+- A escolha da saída de áudio estava dentro dos ajustes do microfone, o que dava
+  a entender que valia só para a conversa. Ela vale para tudo que você ouve —
+  conversa e som da tela — e agora fica em bloco próprio, disponível mesmo para
+  quem só assiste, sem entrar na voz.
+
 ## [1.7.0] - 2026-09-15
 
 ### Adicionado

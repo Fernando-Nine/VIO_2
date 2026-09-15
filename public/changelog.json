@@ -1,5 +1,15 @@
 [
   {
+    "versao": "1.7.1",
+    "data": "2026-09-15",
+    "mudancas": [
+      {
+        "tipo": "corrigido",
+        "texto": "A escolha da saída de áudio estava dentro dos ajustes do microfone, o que dava a entender que valia só para a conversa. Ela vale para tudo que você ouve — conversa e som da tela — e agora fica em bloco próprio, disponível mesmo para quem só assiste."
+      }
+    ]
+  },
+  {
     "versao": "1.7.0",
     "data": "2026-09-15",
     "mudancas": [

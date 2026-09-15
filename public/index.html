@@ -258,17 +258,24 @@
       </label>
 
       <!-- Microfone: cada pessoa ajusta o seu -->
+      <!-- Saída vale pra TUDO que você ouve: a conversa e o som da tela. -->
+      <div id="bloco-saida" class="grupo-campo oculto">
+        <span class="rotulo-campo">Saída de áudio</span>
+        <div class="linha-select">
+          <label for="select-saida">Sai por</label>
+          <select id="select-saida" class="select-campo"></select>
+        </div>
+        <p class="nota-avancado">Vale para tudo que você ouve: a conversa e o som da tela compartilhada.</p>
+      </div>
+
+      <!-- Daqui pra baixo é só a SUA voz. Nada disso toca o áudio da tela, que
+           é transmitido sem processamento nenhum, de propósito. -->
       <div id="bloco-microfone" class="grupo-campo oculto">
         <span class="rotulo-campo">Seu microfone</span>
 
         <div class="linha-select">
           <label for="select-entrada">Entrada</label>
           <select id="select-entrada" class="select-campo"></select>
-        </div>
-
-        <div id="linha-saida" class="linha-select">
-          <label for="select-saida">Saída</label>
-          <select id="select-saida" class="select-campo"></select>
         </div>
 
         <div class="rotulo-slider">

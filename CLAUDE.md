@@ -53,8 +53,14 @@ Decisão explícita de escopo, não limitação temporária:
 - Cores: `#2727F5` para interação; teal (`--tela-glow`) significa **acontecendo agora** —
   o status "ao vivo" e o anel de quem está falando. Não usar para mais nada.
 - Fonte Poppins; leituras técnicas (código da sala, ping) em monoespaçada.
-- Áudio de tela: `echoCancellation`, `noiseSuppression` e `autoGainControl` **sempre false**.
-  É regra de produto, não preferência — ligados, causam oscilação de volume.
+- **Áudio de tela e voz são coisas separadas, e nunca se misturam:**
+  - **Tela** (`getDisplayMedia`): `echoCancellation`, `noiseSuppression` e `autoGainControl`
+    **sempre false**, e nada de ganho, portão ou grafo. Regra de produto, não preferência —
+    ligados, causam oscilação de volume no que devia sair exatamente como é.
+  - **Voz** (`getUserMedia`): os três **ligados**, mais ganho, portão de ruído e escolha de
+    microfone. É o caso pra que esses processamentos existem.
+  - Ajuste de microfone nunca vale pro som da tela. A **saída** de áudio é a única exceção:
+    ela vale pra tudo que a pessoa ouve, e por isso fica em bloco próprio na folha de Ajustes.
 - Alvo de toque mínimo: 44px.
 
 ## Comandos
@@ -96,7 +102,7 @@ com o mesmo conteúdo: `package.json`, `@CHANGELOG.md` e `@public/changelog.json
 app exibe quando se toca no número da versão) — **[HOOK]**: o commit falha se `version` mudar
 sem os outros dois. O app lê a versão de `/api/version`, servida a partir do `package.json`.
 
-Semver: correção = PATCH, feature nova = MINOR. Versão atual: 1.7.0.
+Semver: correção = PATCH, feature nova = MINOR. Versão atual: 1.7.1.
 
 ## Estrutura de pastas
 

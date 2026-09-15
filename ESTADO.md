@@ -3,7 +3,7 @@
 Arquivo vivo. O `CLAUDE.md` guarda as regras permanentes (e fica curto de propósito); **este
 guarda onde estamos**. Substitui o antigo `ESTADO-DO-PROJETO.md`, que ficou desatualizado.
 
-Última atualização: **15/09/2026** · Versão do app: **1.7.0**
+Última atualização: **15/09/2026** · Versão do app: **1.7.1**
 
 ---
 
@@ -106,9 +106,15 @@ Três consequências que valem lembrar:
 
 `track.enabled` agora reflete só mudo e surdez, que são decisão do usuário.
 
-**Dispositivos** (1.7.0) — seletor de entrada e de saída na folha de Ajustes, mais um slider de
-ganho (20% a 300%). Os rótulos dos dispositivos só aparecem depois que o microfone é liberado,
-então a lista é preenchida após o `getUserMedia` e atualizada no evento `devicechange`.
+**Dispositivos** (1.7.0) — seletor de entrada e slider de ganho (20% a 300%) no bloco "Seu
+microfone", que só aparece para quem está na voz. Os rótulos dos dispositivos só existem depois
+que o microfone é liberado, então a lista é preenchida após o `getUserMedia` e atualizada no
+evento `devicechange`.
+
+A **saída** fica em bloco separado (1.7.1), e de propósito: ela não é ajuste de microfone — vale
+para tudo que a pessoa ouve, conversa e som da tela. Por isso aparece mesmo para quem só assiste
+e nunca entrou na voz. Estava dentro do bloco do microfone na 1.7.0, o que dava a entender que
+valia só para a conversa.
 
 > **Escolher a saída só existe no Chrome e derivados.** `setSinkId` não existe no Firefox nem no
 > Safari; nesses navegadores o seletor de saída some em vez de fingir que funciona. A entrada

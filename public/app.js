@@ -82,7 +82,7 @@ const rangeGanho = document.getElementById('range-ganho');
 const valorGanho = document.getElementById('valor-ganho');
 const selectEntrada = document.getElementById('select-entrada');
 const selectSaida = document.getElementById('select-saida');
-const linhaSaida = document.getElementById('linha-saida');
+const blocoSaida = document.getElementById('bloco-saida');
 const chkEco = document.getElementById('chk-eco');
 const chkRuido = document.getElementById('chk-ruido');
 const btnCompartilhar = document.getElementById('btn-compartilhar');
@@ -421,6 +421,7 @@ formEntrar.addEventListener('submit', (e) => {
   }
 
   iniciarMedicaoPing();
+  listarDispositivos();
 });
 
 btnCopiarLink.addEventListener('click', async () => {
@@ -1638,7 +1639,8 @@ async function listarDispositivos() {
 
   const saidas = lista.filter((d) => d.kind === 'audiooutput');
   preencherSelect(selectSaida, saidas, estado.saidaId, 'Saída padrão');
-  linhaSaida.classList.toggle('oculto', !suportaEscolherSaida || saidas.length === 0);
+  // A saida nao depende de estar na voz: ela vale pro som da tela tambem.
+  blocoSaida.classList.toggle('oculto', !suportaEscolherSaida || saidas.length === 0);
 }
 
 async function aplicarSaidaEm(elemento) {
