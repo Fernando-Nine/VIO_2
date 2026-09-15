@@ -3,7 +3,7 @@
 Arquivo vivo. O `CLAUDE.md` guarda as regras permanentes (e fica curto de propósito); **este
 guarda onde estamos**. Substitui o antigo `ESTADO-DO-PROJETO.md`, que ficou desatualizado.
 
-Última atualização: **15/09/2026** · Versão do app: **1.2.0**
+Última atualização: **15/09/2026** · Versão do app: **1.3.0**
 
 ---
 
@@ -46,6 +46,13 @@ nativo específico pro Safari do iPhone.
 real da conexão de vídeo; aviso na tela quando uma conexão específica falha; controles somem
 sozinhos com a inatividade.
 
+**Reconexão** (1.3.0) — queda de rede ou restart do servidor: o cliente volta sozinho para a
+sala, sem F5. O `socket.id` muda na volta, então todos os mapas indexados por id são refeitos
+do zero a partir do `room-state`. Quem estava compartilhando volta compartilhando — o
+`localStream` sobrevive à queda de propósito, senão o navegador pediria a tela de novo. Se a
+reentrada bater no limite de taxa (rede instável com o servidor vivo), o cliente espera e tenta
+de novo, com jitter, até cinco vezes antes de pedir F5.
+
 **Segurança** — rate limit próprio, sem biblioteca (criação de sala, entrada, sinalização,
 ações de share, ping), cada um com sua janela e limpeza periódica; validação de `Origin`;
 leitura do IP real atrás do proxy do Render; escape de nome de participante; nenhuma conta,
@@ -56,8 +63,6 @@ changelog dentro do app; AGPLv3.
 
 ## 3. O que NÃO existe (apesar de discutido)
 
-- **Reconexão automática** — o app não se recompõe sozinho depois que o Render reinicia; hoje
-  só resolve com F5. Não há `restartIce`, não há re-`join-room`. É a próxima tarefa.
 - **PWA** — não existe `manifest.json` nem service worker. "Instalável" hoje é zero.
 - **Chat de voz** — foi desenhado em detalhe e chegou a existir um `voz.js` numa sessão que se
   perdeu antes de salvar. O código não existe. Os ícones já estão baixados em `public/icons/`

@@ -114,6 +114,7 @@ const TODAS_FOLHAS = [folhaInfoSala, painelParticipantes, painelAvancado, folhaC
 const estado = {
   meuNome: '',
   roomId: '',
+  naSala: false, // true entre entrar e sair — distingue queda de rede de saida voluntaria
   salaCriadaEm: null,
   participantes: new Map(), // id -> nome (todo mundo, EXCETO eu)
   sharingIds: new Set(), // quem esta compartilhando agora (pode ser mais de um, inclusive eu)
@@ -338,6 +339,14 @@ btnFecharChangelog.addEventListener('click', fecharFolhas);
 // ---- feedback de limite de taxa (ex: muitas salas criadas rapido demais) ----
 
 socket.on('room-error', ({ motivo }) => {
+  // Se isto chegou no meio de uma reconexao, nao e o usuario martelando a
+  // porta: e o servidor tendo acabado de reiniciar com todo mundo voltando ao
+  // mesmo tempo. Espera e tenta de novo em vez de largar a pessoa fora da sala.
+  if (reconectando) {
+    agendarNovaTentativa();
+    return;
+  }
+
   if (motivo === 'limite-criacao') {
     mostrarAlerta('Muitas salas novas em pouco tempo — espera um pouco e tenta de novo.', 5000);
   } else if (motivo === 'limite-entrada') {
@@ -357,6 +366,7 @@ formEntrar.addEventListener('submit', (e) => {
 
   estado.meuNome = nome;
   estado.roomId = sala;
+  estado.naSala = true;
   socket.emit('join-room', { roomId: sala, name: nome });
 
   telaEntrada.classList.add('oculto');
@@ -386,6 +396,12 @@ btnCopiarLink.addEventListener('click', async () => {
 });
 
 btnSairSala.addEventListener('click', () => {
+  // antes de qualquer coisa: a partir daqui o disconnect abaixo e voluntario,
+  // e nao deve disparar a reconexao automatica
+  estado.naSala = false;
+  reconectando = false;
+  clearTimeout(timerReentrada);
+
   if (estado.sharingIds.has(socket.id)) pararCompartilhamento();
   incomingPCs.forEach((pc) => pc.close());
   incomingPCs.clear();
@@ -487,7 +503,20 @@ socket.on('room-state', ({ participants, sharingIds, criadaEm }) => {
   renderizarParticipantes();
   atualizarBotaoCompartilhar();
 
+  const acabeiDeVoltar = reconectando;
+  if (acabeiDeVoltar) {
+    reconectando = false;
+    tentativaReentrada = 0;
+    clearTimeout(timerReentrada);
+    iniciarMedicaoPing();
+    mostrarAlerta('Reconectado.');
+    // Se a tela ainda esta capturada, volto a anunciar que estou compartilhando:
+    // o stream nunca parou, so as conexoes precisam renascer.
+    if (estado.localStream) socket.emit('start-share');
+  }
+
   if (estado.sharingIds.size > 0) focarEm([...estado.sharingIds][0]); // ja tem gente compartilhando - foca na primeira automaticamente
+  else if (acabeiDeVoltar && !estado.localStream) resetarMoldura(); // tira o aviso de "Reconectando..."
 });
 
 socket.on('participant-joined', ({ id, name }) => {
@@ -509,6 +538,83 @@ socket.on('participant-left', ({ id }) => {
     outgoingPCs.delete(id);
     filasIceSaida.delete(id);
   }
+});
+
+// ---------------------------------------------------------------------------
+// Reconexao
+//
+// O Socket.IO reconecta o transporte sozinho, mas isso nao basta: o servidor
+// guarda as salas em memoria, entao depois de um restart a sala nao existe
+// mais e ninguem sabe que eu estava nela. Alem disso o meu socket.id MUDA na
+// reconexao — e todos os mapas daqui (participantes, sharingIds, PCs, filas de
+// ICE) sao indexados por socket id. Nada do estado antigo sobrevive.
+//
+// O que sobrevive de proposito e o localStream: derrubar as tracks faria o
+// navegador pedir a tela de novo, e uma sessao de duas horas viraria duas horas
+// perdidas por um soluco de rede. So as PeerConnections morrem e sao refeitas.
+// ---------------------------------------------------------------------------
+
+const MAX_TENTATIVAS_REENTRADA = 5;
+
+let reconectando = false; // entre o disconnect e o room-state de volta
+let tentativaReentrada = 0;
+let timerReentrada = null;
+
+function descartarConexoes() {
+  outgoingPCs.forEach((pc) => pc.close());
+  outgoingPCs.clear();
+  filasIceSaida.clear();
+  incomingPCs.forEach((pc) => pc.close());
+  incomingPCs.clear();
+  filasIceEntrada.clear();
+}
+
+function reentrarNaSala() {
+  descartarConexoes();
+  estado.participantes.clear();
+  estado.sharingIds.clear();
+  estado.streamsDisponiveis.clear();
+  estado.focoAtual = null;
+
+  socket.emit('join-room', { roomId: estado.roomId, name: estado.meuNome });
+}
+
+// O limite de taxa do servidor nao sabe distinguir reconexao de alguem
+// martelando a porta. Quando o servidor reinicia, todo mundo volta quase junto
+// e pode esbarrar no limite — entao aqui a resposta e esperar e tentar de novo,
+// com jitter pra nao voltarem todos no mesmo instante.
+function agendarNovaTentativa() {
+  tentativaReentrada += 1;
+  if (tentativaReentrada > MAX_TENTATIVAS_REENTRADA) {
+    reconectando = false;
+    mostrarPlaceholder('Não consegui voltar para a sala. Atualize a página para tentar de novo.');
+    return;
+  }
+
+  const espera = 2000 * 2 ** (tentativaReentrada - 1) + Math.random() * 1000;
+  mostrarPlaceholder(`Servidor ocupado. Tentando de novo em ${Math.round(espera / 1000)}s…`);
+  clearTimeout(timerReentrada);
+  timerReentrada = setTimeout(reentrarNaSala, espera);
+}
+
+socket.on('disconnect', () => {
+  if (!estado.naSala) return; // saida voluntaria, ou nem entrei ainda
+
+  reconectando = true;
+  tentativaReentrada = 0;
+  pararMedicaoPing();
+  descartarConexoes();
+  videoRemoto.srcObject = null;
+
+  pontoPing.classList.remove('ping-bom', 'ping-medio');
+  pontoPing.classList.add('ping-ruim');
+  mostrarPlaceholder('Conexão perdida. Reconectando…');
+});
+
+socket.on('connect', () => {
+  if (!reconectando) return; // primeira conexao: o formulario de entrada ja cuida do join-room
+  tentativaReentrada = 0;
+  reentrarNaSala();
 });
 
 // ---------------------------------------------------------------------------
@@ -820,7 +926,10 @@ btnCompartilhar.addEventListener('click', () => {
 });
 
 async function iniciarCompartilhamento() {
-  if (estado.sharingIds.has(socket.id) || estado.streamPendente) return; // ja compartilhando, ou pedido em andamento
+  // localStream tambem barra: durante uma reconexao o sharingIds esta vazio,
+  // mas a tela continua capturada — sem esta guarda o navegador pediria a tela
+  // de novo por cima de um compartilhamento que nunca parou.
+  if (estado.sharingIds.has(socket.id) || estado.streamPendente || estado.localStream) return;
 
   const qualidade = lerValoresQualidadeAtual();
   let stream;
@@ -929,6 +1038,12 @@ socket.on('share-started', ({ id }) => {
 
   if (id === socket.id && estado.streamPendente) {
     confirmarInicioCompartilhamento();
+  } else if (id === socket.id && estado.localStream) {
+    // voltei de uma reconexao ainda com a tela capturada: nao ha stream pendente
+    // pra confirmar, e sim o mesmo stream de sempre precisando reaparecer.
+    estado.streamsDisponiveis.set(socket.id, estado.localStream);
+    if (estado.focoAtual) renderizarTiraTransmissoes();
+    else focarEm(socket.id);
   } else {
     renderizarTiraTransmissoes(); // aparece como opcao na tira — so conecta de verdade se alguem focar nela
   }

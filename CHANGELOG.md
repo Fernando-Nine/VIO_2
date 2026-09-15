@@ -7,6 +7,16 @@ segue [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAJOR.MINOR.PA
 O mesmo conteúdo fica disponível dentro do próprio app, tocando no número da versão na
 tela de entrada.
 
+## [1.3.0] - 2026-09-15
+
+### Adicionado
+- Reconexão automática. Se a rede oscilar ou o servidor reiniciar, o VIO volta
+  sozinho para a sala — antes só resolvia atualizando a página.
+- Quem está compartilhando volta compartilhando: a tela capturada sobrevive à
+  queda, então o navegador não pergunta de novo o que compartilhar.
+- Aviso na tela durante a reconexão e nova tentativa automática, com espera
+  crescente, quando o servidor está ocupado demais para receber de volta.
+
 ## [1.2.0] - 2026-08-24
 
 ### Alterado

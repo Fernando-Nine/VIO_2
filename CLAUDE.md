@@ -23,6 +23,9 @@ Decisão explícita de escopo, não limitação temporária:
   `RTCPeerConnection` por par **por transmissão efetivamente assistida** — quem compartilha
   só conecta a quem está de fato olhando.
 - `@public/style.css` — CSS único, mobile-first.
+- **Reconexão:** na volta o `socket.id` **muda**, e todos os mapas do cliente
+  (`participantes`, `sharingIds`, PCs, filas de ICE) são indexados por ele — nenhum sobrevive.
+  O `localStream` sobrevive de propósito: derrubá-lo faria o navegador pedir a tela de novo.
 - Voz e câmera (quando existirem) usam **conexões separadas** das de tela. Não misturar
   tracks de tela com tracks de microfone/câmera na mesma PeerConnection.
 
@@ -79,7 +82,7 @@ com o mesmo conteúdo: `package.json`, `@CHANGELOG.md` e `@public/changelog.json
 app exibe quando se toca no número da versão) — **[HOOK]**: o commit falha se `version` mudar
 sem os outros dois. O app lê a versão de `/api/version`, servida a partir do `package.json`.
 
-Semver: correção = PATCH, feature nova = MINOR. Versão atual: 1.2.0.
+Semver: correção = PATCH, feature nova = MINOR. Versão atual: 1.3.0.
 
 ## Estrutura de pastas
 
@@ -106,19 +109,18 @@ vio/
 
 ## Roadmap — nesta ordem
 
-1. **Reconexão** (em aberto, prioridade atual). O Render free hiberna e reinicia, e o estado
-   das salas é em memória. O cliente precisa detectar o `disconnect`, refazer `join-room`
-   sozinho e reconstruir as PeerConnections. ICE restart sozinho não resolve: depois do
-   restart a sala não existe mais no servidor.
-2. **PWA instalável**. `manifest.json` + service worker mínimo. O SW cacheia só o shell
+1. **PWA instalável**. `manifest.json` + service worker mínimo. O SW cacheia só o shell
    (html/css/js/ícones), **nunca** `/socket.io/` nem estado de sala. Estratégia network-first.
-3. **Chat de voz**. Conexões separadas; sempre-para-todos (diferente da tela, que é sob
+2. **Chat de voz**. Conexões separadas; sempre-para-todos (diferente da tela, que é sob
    demanda) — é daí que vem o teto de ~6 pessoas. Microfone usa processamento **ligado**,
    o oposto do áudio de tela.
-4. **Câmera**. Conexões separadas; troca frontal/traseira no celular.
-5. **TURN**. Ligado por variável de ambiente, com credenciais efêmeras. Só depois de 1–4.
-6. **Tauri + WASAPI**. Não é "empacotar o front-end": exige captura de áudio por processo em
+3. **Câmera**. Conexões separadas; troca frontal/traseira no celular.
+4. **TURN**. Ligado por variável de ambiente, com credenciais efêmeras. Já há um caso
+   confirmado de quem não conecta sem ele (NAT simétrico) — ver `@ESTADO.md`.
+5. **Tauri + WASAPI**. Não é "empacotar o front-end": exige captura de áudio por processo em
    Rust e injetar esse áudio na PeerConnection da WebView2. É o item mais caro da lista.
+
+Reconexão saiu daqui na 1.3.0 — está implementada.
 
 ## Segurança — pendências já mapeadas
 

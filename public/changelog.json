@@ -1,5 +1,14 @@
 [
   {
+    "versao": "1.3.0",
+    "data": "2026-09-15",
+    "mudancas": [
+      { "tipo": "adicionado", "texto": "Reconexão automática. Se a rede oscilar ou o servidor reiniciar, o VIO volta sozinho para a sala — antes só resolvia atualizando a página." },
+      { "tipo": "adicionado", "texto": "Quem está compartilhando volta compartilhando: a tela capturada sobrevive à queda, então o navegador não pergunta de novo o que compartilhar." },
+      { "tipo": "adicionado", "texto": "Aviso na tela durante a reconexão e nova tentativa automática, com espera crescente, quando o servidor está ocupado demais para receber de volta." }
+    ]
+  },
+  {
     "versao": "1.2.0",
     "data": "2026-08-24",
     "mudancas": [
