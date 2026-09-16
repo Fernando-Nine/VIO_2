@@ -7,6 +7,37 @@ segue [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAJOR.MINOR.PA
 O mesmo conteúdo fica disponível dentro do próprio app, tocando no número da versão na
 tela de entrada.
 
+## [1.9.0] - 2026-09-16
+
+### Corrigido
+- Quem já estava na sala quando alguém começava a compartilhar não via nada. A
+  transmissão não entrava em foco sozinha, e como a tira de miniaturas só
+  aparece com duas ou mais transmissões, não sobrava nada para clicar — a
+  pessoa ficava olhando um aviso de "ninguém está compartilhando" que era
+  mentira. Quem entrava depois funcionava, o que tornava a falha confusa.
+- As iniciais cobriam a prévia nas miniaturas. O vídeo estava lá e tocando, mas
+  a placa com a letra ficava por cima dele: dava para ver o nome e a inicial, e
+  nunca a imagem.
+- A bolha de "falando" era recortada e passava por cima do nome. O avatar ficava
+  dentro do bloco que corta o texto longo, então o anel batia nessa borda; agora
+  ele fica fora desse bloco e é desenhado atrás do conteúdo.
+- O microfone e o fone diziam "desligado" de dois jeitos diferentes — um com o
+  risco embutido no ícone, virado para um lado, e o outro com um risco vermelho
+  na diagonal oposta. Agora os dois usam o mesmo ícone base e o mesmo risco.
+- O histórico de atualizações estava grudado: a etiqueta colava no texto e as
+  linhas não respiravam.
+
+### Adicionado
+- Volume individual de cada pessoa, ao lado do silenciar. Como o silenciar, é só
+  para você: não vai para o servidor e a pessoa não fica sabendo.
+- Prévias ao vivo nas miniaturas, em Ajustes › Vídeo. Desligadas por padrão: com
+  elas ligadas você recebe todas as transmissões ao mesmo tempo, não só a que
+  está assistindo, e isso gasta banda de quem transmite.
+
+### Alterado
+- Os Ajustes viraram duas abas, Vídeo e Áudio. Numa coluna só era preciso rolar
+  demais para achar qualquer coisa, e as duas metades não têm relação.
+
 ## [1.8.0] - 2026-09-15
 
 ### Adicionado

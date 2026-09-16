@@ -1,5 +1,43 @@
 [
   {
+    "versao": "1.9.0",
+    "data": "2026-09-16",
+    "mudancas": [
+      {
+        "tipo": "corrigido",
+        "texto": "Quem já estava na sala quando alguém começava a compartilhar não via nada: a transmissão não entrava em foco sozinha e, com só uma no ar, não havia miniatura para clicar. Quem entrava depois funcionava, o que tornava a falha confusa."
+      },
+      {
+        "tipo": "corrigido",
+        "texto": "As iniciais cobriam a prévia nas miniaturas. O vídeo estava lá e tocando, mas a placa com a letra ficava por cima dele."
+      },
+      {
+        "tipo": "corrigido",
+        "texto": "A bolha de “falando” era recortada e passava por cima do nome. Agora ela tem espaço e é desenhada atrás do conteúdo."
+      },
+      {
+        "tipo": "corrigido",
+        "texto": "O microfone e o fone diziam “desligado” de dois jeitos diferentes. Agora usam o mesmo ícone base e o mesmo risco."
+      },
+      {
+        "tipo": "corrigido",
+        "texto": "O histórico de atualizações estava grudado: a etiqueta colava no texto e as linhas não respiravam."
+      },
+      {
+        "tipo": "adicionado",
+        "texto": "Volume individual de cada pessoa, ao lado do silenciar. Como o silenciar, é só para você: não vai para o servidor e a pessoa não fica sabendo."
+      },
+      {
+        "tipo": "adicionado",
+        "texto": "Prévias ao vivo nas miniaturas, em Ajustes › Vídeo. Desligadas por padrão: ligadas, você recebe todas as transmissões ao mesmo tempo e isso gasta banda de quem transmite."
+      },
+      {
+        "tipo": "alterado",
+        "texto": "Os Ajustes viraram duas abas, Vídeo e Áudio. Numa coluna só era preciso rolar demais para achar qualquer coisa."
+      }
+    ]
+  },
+  {
     "versao": "1.8.0",
     "data": "2026-09-15",
     "mudancas": [

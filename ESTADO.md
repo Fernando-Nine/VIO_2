@@ -3,7 +3,7 @@
 Arquivo vivo. O `CLAUDE.md` guarda as regras permanentes (e fica curto de propósito); **este
 guarda onde estamos**. Substitui o antigo `ESTADO-DO-PROJETO.md`, que ficou desatualizado.
 
-Última atualização: **15/09/2026** · Versão do app: **1.8.0**
+Última atualização: **16/09/2026** · Versão do app: **1.9.0**
 
 ---
 
@@ -153,6 +153,33 @@ prévia**; quem assiste recebe a imagem como ela é, senão texto e placa sairia
 > **Um foco por vez.** Trocar de transmissão solta a anterior — inclusive entre tela e câmera da
 > mesma pessoa. É o comportamento certo num mesh: ninguém deve carregar dois vídeos enquanto
 > olha para um só.
+
+**Primeiro teste com gente de verdade** (16/09/2026) — o Nine rodou com amigos e trouxe a
+lista que virou a 1.9.0. Dois achados valem registro porque são de método, não de código:
+
+- **Quem já estava na sala não via a transmissão começar.** O foco automático só existia no
+  `room-state`, ou seja, para quem *entrava* com alguém já compartilhando. Para quem já estava
+  lá, `focoAtual` ficava nulo — e a tira de miniaturas se esconde com só uma transmissão, então
+  não havia nem o que clicar. Sete suítes passavam porque **todas chamavam `focarEm()` pelo
+  console**, pulando exatamente o caminho quebrado. Daí a suíte `teste-interface`, que só clica.
+- **As iniciais cobriam a prévia.** O JS alternava a classe `sem-previa` no cartão desde sempre,
+  mas **nenhuma regra de CSS usava essa classe** para esconder a placa das iniciais. O vídeo
+  tocava atrás dela. É o tipo de coisa que nenhum teste de estado pega: só olhando.
+
+**Primeiro teste com gente de verdade** (16/09/2026) — o Nine rodou com amigos e trouxe a
+lista que virou a 1.9.0. Dois achados valem registro porque são de método, não de código:
+
+- **Quem já estava na sala não via a transmissão começar.** O foco automático só existia no
+  `room-state`, ou seja, para quem *entrava* com alguém já compartilhando. Para quem já estava
+  lá, `focoAtual` ficava nulo — e a tira de miniaturas se esconde com só uma transmissão, então
+  não havia nem o que clicar. Sete suítes passavam porque **todas chamavam `focarEm()` pelo
+  console**, pulando exatamente o caminho quebrado. Daí a suíte `teste-interface`, que só clica.
+- **As iniciais cobriam a prévia.** O JS alternava a classe `sem-previa` no cartão desde sempre,
+  mas **nenhuma regra de CSS usava essa classe** para esconder a placa das iniciais. O vídeo
+  tocava atrás dela. É o tipo de coisa que nenhum teste de estado pega: só olhando.
+
+O que o relato confirmou de bom: conexão entre amigos funcionou, voz funcionou, e ninguém
+esbarrou em NAT desta vez. O amigo com NAT simétrico continua sendo o caso do TURN.
 
 **Reconexão** (1.3.0) — queda de rede ou restart do servidor: o cliente volta sozinho para a
 sala, sem F5. O `socket.id` muda na volta, então todos os mapas indexados por id são refeitos

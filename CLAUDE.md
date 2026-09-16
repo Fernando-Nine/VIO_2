@@ -79,8 +79,13 @@ npm install
 npm start          # http://localhost:3000
 ```
 
-Não existe suite de testes automatizados (lacuna conhecida). Teste manual obrigatório antes
-de fechar qualquer tarefa que toque em mídia:
+As suítes de integração (Playwright, fora do repositório) devem **clicar na interface**, não
+chamar função interna. Um bug real — quem já estava na sala não via a transmissão começar —
+passou por sete suítes porque todas chamavam `focarEm()` direto pelo console, pulando
+justamente o caminho que estava quebrado. Regra que saiu daí: se a pessoa faz com o dedo, o
+teste faz com o clique.
+
+Teste manual obrigatório antes de fechar qualquer tarefa que toque em mídia:
 
 1. Duas abas no mesmo PC, mesma sala — compartilhar, assistir, parar.
 2. PC + celular na mesma rede, pelo IP local.
@@ -111,7 +116,7 @@ com o mesmo conteúdo: `package.json`, `@CHANGELOG.md` e `@public/changelog.json
 app exibe quando se toca no número da versão) — **[HOOK]**: o commit falha se `version` mudar
 sem os outros dois. O app lê a versão de `/api/version`, servida a partir do `package.json`.
 
-Semver: correção = PATCH, feature nova = MINOR. Versão atual: 1.8.0.
+Semver: correção = PATCH, feature nova = MINOR. Versão atual: 1.9.0.
 
 ## Estrutura de pastas
 
