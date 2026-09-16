@@ -209,9 +209,9 @@ button:focus {
 }
 
 @keyframes anel-falando {
-  0%   { transform: scale(0.9); opacity: 0.9; }
-  70%  { transform: scale(1.35); opacity: 0; }
-  100% { transform: scale(1.35); opacity: 0; }
+  0%   { transform: scale(0.92); opacity: 0.9; }
+  70%  { transform: scale(1.22); opacity: 0; }
+  100% { transform: scale(1.22); opacity: 0; }
 }
 
 /* ============================================================
@@ -964,16 +964,23 @@ button:focus {
   background-color: #000;
 }
 
+/* As iniciais SUBSTITUEM a previa quando nao ha imagem — nao ficam por cima
+   dela. O JS marca .sem-previa no cartao quando nao existe stream daquela
+   transmissao; sem esta regra a placa cobria o video mesmo com ele tocando. */
 .cartao-inicial {
   position: absolute;
   inset: 0;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   font-size: 26px;
   font-weight: var(--peso-bold);
   color: #fff;
   background-image: var(--grad-marca);
+}
+
+.cartao-transmissao.sem-previa .cartao-inicial {
+  display: flex;
 }
 
 .rotulo-cartao {
@@ -1275,6 +1282,52 @@ button:focus {
 
 .btn-fechar-folha .icone { width: 18px; height: 18px; }
 
+/* -- Abas dos ajustes -- */
+.abas {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  margin-bottom: 18px;
+  border-radius: var(--raio-md);
+  background-color: var(--superficie-fraca);
+  border: 1px solid var(--borda);
+}
+
+.aba {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px; /* alvo de toque */
+  padding: 0 12px;
+  border-radius: calc(var(--raio-md) - 4px);
+  background-color: transparent;
+  color: var(--texto-fraco);
+  font-size: 14px;
+  font-weight: var(--peso-medio);
+  transition: background-color var(--dur-rapida) var(--ease-suave),
+              color var(--dur-rapida) var(--ease-suave);
+}
+
+.aba:hover { color: var(--texto); }
+
+.aba .icone { width: 16px; height: 16px; }
+
+.aba.ativa {
+  background-color: var(--superficie-solida);
+  border: 1px solid var(--borda);
+  color: var(--texto);
+}
+
+/* Cada painel repete o espacamento do corpo da folha: eles se revezam no mesmo
+   lugar, entao precisam respirar igual. */
+.painel-aba {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
 .corpo-folha {
   display: flex;
   flex-direction: column;
@@ -1331,9 +1384,11 @@ button:focus {
 
 .lista-participantes li {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   padding: 10px 12px;
+  overflow: visible; /* o anel de "falando" passa da borda do avatar de proposito */
   border-radius: var(--raio-md);
   background-color: var(--superficie-fraca);
   border: 1px solid var(--borda);
@@ -1343,6 +1398,7 @@ button:focus {
 
 .avatar-participante {
   position: relative;
+  isolation: isolate; /* prende o anel (z-index:-1) a este avatar */
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1357,12 +1413,21 @@ button:focus {
   box-shadow: var(--sombra-sm);
 }
 
-.nome-participante {
+/* O bloco de identidade corta o texto longo; o AVATAR fica fora dele, senao o
+   anel de "falando" (que cresce alem da borda) sairia recortado pelo overflow. */
+.identidade-participante {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 14px;
   font-weight: var(--peso-medio);
   color: var(--texto);
+}
+
+.texto-participante {
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1585,17 +1650,44 @@ button:focus {
 .lista-changelog {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 18px;
 }
 
 .bloco-changelog {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 16px;
+  gap: 14px;
+  padding: 18px 16px;
   border-radius: var(--raio-md);
   background-color: var(--superficie-fraca);
   border: 1px solid var(--borda);
+}
+
+.bloco-changelog h3 {
+  font-size: 13px;
+  font-weight: var(--peso-bold);
+  letter-spacing: 0.02em;
+  color: var(--texto-fraco);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+.bloco-changelog ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* A etiqueta fica na propria linha, acima do texto: ao lado, num celular, ela
+   espremia a frase contra a borda e era isso que deixava tudo grudado. */
+.bloco-changelog li {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--texto-fraco);
 }
 
 .etiqueta-tipo {
@@ -1760,11 +1852,12 @@ button:focus {
 .avatar-participante.falando::before {
   content: "";
   position: absolute;
-  inset: -4px;
+  inset: -3px;
   border-radius: var(--raio-full);
   border: 2px solid var(--tela-glow);
   animation: anel-falando 1.4s var(--ease-suave) infinite;
   pointer-events: none;
+  z-index: -1; /* passa por TRAS do avatar e do nome, nunca por cima da leitura */
 }
 
 /* Medidor de nível de voz — preenchimento por variável --nivel (0 a 100).
@@ -1863,7 +1956,41 @@ button:focus {
   pointer-events: none;
 }
 
-/* Silenciar uma pessoa específica, na lista de participantes. */
+/* Volume e silenciar de UMA pessoa, na lista de participantes. */
+.controles-participante {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.range-volume-pessoa {
+  width: 72px;
+  height: 22px; /* alvo de toque: o polegar pega a faixa inteira, nao so o tracinho */
+  flex: none;
+  accent-color: var(--marca);
+  cursor: pointer;
+}
+
+.range-volume-pessoa:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Em tela estreita a faixa nao cabe ao lado do nome — mas sumir com ela seria
+   tirar o controle justamente de quem usa no celular. Ela desce pra propria
+   linha e ocupa a largura toda, que ate pega melhor no polegar. */
+@media (max-width: 460px) {
+  .controles-participante {
+    flex-basis: 100%;
+    margin-top: 4px;
+  }
+  .range-volume-pessoa {
+    flex: 1;
+    width: auto;
+  }
+}
+
 .btn-silenciar {
   width: 32px;
   height: 32px;

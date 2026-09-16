@@ -130,6 +130,12 @@ const valorBitrate = document.getElementById('valor-bitrate');
 const rangeEscala = document.getElementById('range-escala');
 const valorEscala = document.getElementById('valor-escala');
 const notaSurface = document.getElementById('nota-surface');
+const chkPrevias = document.getElementById('chk-previas');
+const notaSemVoz = document.getElementById('nota-sem-voz');
+const abaVideo = document.getElementById('aba-video');
+const abaAudio = document.getElementById('aba-audio');
+const painelVideo = document.getElementById('painel-video');
+const painelAudio = document.getElementById('painel-audio');
 
 const alertaEl = document.getElementById('alerta');
 
@@ -158,6 +164,8 @@ const estado = {
   vozMudo: false, // mudo local: a conexao continua, a track e que para de mandar
   vozSurdo: false, // "fone desligado": nao ouco ninguem E nao mando nada
   mudosLocais: new Set(), // pessoas que EU silenciei — so pra mim, ninguem sabe
+  volumesLocais: new Map(), // id -> 0..100, volume individual de cada pessoa (so pra mim)
+  previasAoVivo: false, // conectar em TODAS as transmissoes so pra mostrar miniatura
   micBruto: null, // o que sai do getUserMedia, antes do grafo de audio
   micEco: true, // cancelamento de eco
   micRuido: true, // supressao de ruido
@@ -300,6 +308,28 @@ btnParticipantes.addEventListener('click', () => abrirFolha(painelParticipantes)
 btnFecharParticipantes.addEventListener('click', fecharFolhas);
 
 btnAjustes.addEventListener('click', () => abrirFolha(painelAvancado));
+// ---- abas dos ajustes ----
+// A folha tinha virado uma coluna longa demais: video e audio nao tem nada a
+// ver um com o outro, e misturar os dois obrigava a rolar pra achar qualquer
+// coisa. Duas abas, cada uma com um assunto.
+function trocarAba(qual) {
+  const video = qual === 'video';
+  abaVideo.classList.toggle('ativa', video);
+  abaAudio.classList.toggle('ativa', !video);
+  abaVideo.setAttribute('aria-selected', String(video));
+  abaAudio.setAttribute('aria-selected', String(!video));
+  painelVideo.classList.toggle('oculto', !video);
+  painelAudio.classList.toggle('oculto', video);
+}
+
+chkPrevias.addEventListener('change', () => {
+  estado.previasAoVivo = chkPrevias.checked;
+  sincronizarPrevias();
+});
+
+abaVideo.addEventListener('click', () => trocarAba('video'));
+abaAudio.addEventListener('click', () => trocarAba('audio'));
+
 btnFecharAvancado.addEventListener('click', fecharFolhas);
 
 // ---------------------------------------------------------------------------
@@ -536,35 +566,52 @@ function renderizarParticipantes() {
   const criarItem = (id, nome, souEu) => {
     const item = document.createElement('li');
     item.dataset.id = id; // o loop de nivel de voz acha o avatar por aqui
-    const esquerda = document.createElement('span');
-    esquerda.className = 'nome-participante';
-    esquerda.innerHTML = `<span class="avatar-participante" aria-hidden="true">${iniciaisDoNome(nome)}</span><span>${escapeHtml(nome)}</span>`;
-    if (souEu) esquerda.innerHTML += ' <span class="etiqueta-voce">(você)</span>';
 
+    // O avatar fica FORA do bloco que corta o texto: o anel de "falando" cresce
+    // alem da borda dele, e dentro de um overflow:hidden ele sairia recortado.
+    const avatar = document.createElement('span');
+    avatar.className = 'avatar-participante';
+    avatar.setAttribute('aria-hidden', 'true');
+    avatar.textContent = iniciaisDoNome(nome);
+    if ((niveisVoz.get(id) || 0) > LIMIAR_FALANDO) avatar.classList.add('falando');
+
+    const identidade = document.createElement('span');
+    identidade.className = 'identidade-participante';
+
+    const texto = document.createElement('span');
+    texto.className = 'texto-participante';
+    texto.textContent = nome;
+    identidade.appendChild(texto);
+
+    if (souEu) {
+      const etiqueta = document.createElement('span');
+      etiqueta.className = 'etiqueta-voce';
+      etiqueta.textContent = '(você)';
+      identidade.appendChild(etiqueta);
+    }
+
+    // Microfone e camera usam o mesmo desenho do rodape: icone base mais a
+    // classe .cortado pra dizer "desligado". Um risco so, sempre igual.
     if (estado.voiceIds.has(id)) {
       // De quem nao sou eu so da pra saber que esta na voz — mudo remoto nao e
       // sinalizado. Quem esta falando aparece pelo anel no avatar.
       const mudo = souEu && estado.vozMudo;
       const mic = document.createElement('span');
-      mic.className = `icone ${mudo ? 'icone-microphone-slash' : 'icone-microphone'}`;
+      mic.className = `icone icone-microphone${mudo ? ' cortado' : ''}`;
       mic.setAttribute('aria-label', mudo ? 'microfone desligado' : 'na conversa');
-      esquerda.appendChild(mic);
+      identidade.appendChild(mic);
     }
 
-    // reaplica o anel de "falando": innerHTML acabou de apagar o estado anterior
-    const avatar = esquerda.querySelector('.avatar-participante');
-    if (avatar && (niveisVoz.get(id) || 0) > LIMIAR_FALANDO) avatar.classList.add('falando');
-
-    // A camera aparece como icone, do lado do microfone: quem esta com tela E
-    // camera no ar precisa dos dois sinais ao mesmo tempo.
     if (estado.cameraIds.has(id)) {
       const cam = document.createElement('span');
       cam.className = 'icone icone-video-camera-alt';
       cam.setAttribute('aria-label', 'com a câmera ligada');
-      esquerda.appendChild(cam);
+      identidade.appendChild(cam);
     }
 
-    item.appendChild(esquerda);
+    item.appendChild(avatar);
+    item.appendChild(identidade);
+
     if (estado.sharingIds.has(id)) {
       const badge = document.createElement('span');
       badge.className = 'etiqueta-compartilhando';
@@ -572,19 +619,40 @@ function renderizarParticipantes() {
       item.appendChild(badge);
     }
 
-    // Silenciar alguem e decisao SO SUA: nao vai pro servidor, a pessoa nao
-    // fica sabendo, e some quando voce sai da sala.
+    // Silenciar alguem e ajustar o volume dela sao decisao SO SUA: nao vao pro
+    // servidor, a pessoa nao fica sabendo, e somem quando voce sai da sala.
     if (!souEu && estado.voiceIds.has(id)) {
       const calado = estado.mudosLocais.has(id);
+
+      const controles = document.createElement('span');
+      controles.className = 'controles-participante';
+
+      const faixa = document.createElement('input');
+      faixa.type = 'range';
+      faixa.min = '0';
+      faixa.max = '100';
+      faixa.value = String(volumeDe(id));
+      faixa.className = 'range-volume-pessoa';
+      faixa.disabled = calado;
+      faixa.setAttribute('aria-label', `Volume de ${nome}`);
+      faixa.title = `Volume de ${nome}: ${volumeDe(id)}%`;
+      faixa.addEventListener('input', () => {
+        definirVolumeDe(id, faixa.value);
+        faixa.title = `Volume de ${nome}: ${faixa.value}%`;
+      });
+
       const botao = document.createElement('button');
       botao.type = 'button';
-      botao.className = 'btn-silenciar';
-      botao.innerHTML = `<span class="icone ${calado ? 'icone-volume-slash' : 'icone-volume'}" aria-hidden="true"></span>`;
+      botao.className = `btn-silenciar${calado ? ' cortado' : ''}`;
+      botao.innerHTML = '<span class="icone icone-volume" aria-hidden="true"></span>';
       botao.setAttribute('aria-pressed', String(calado));
       botao.setAttribute('aria-label', calado ? `Voltar a ouvir ${nome}` : `Silenciar ${nome} só pra você`);
       botao.title = botao.getAttribute('aria-label');
       botao.addEventListener('click', () => alternarMudoDe(id));
-      item.appendChild(botao);
+
+      controles.appendChild(faixa);
+      controles.appendChild(botao);
+      item.appendChild(controles);
     }
     return item;
   };
@@ -646,6 +714,7 @@ socket.on('room-state', ({ participants, sharingIds, voiceIds, cameraIds, criada
   }
 
   sincronizarConexoesVoz();
+  if (estado.previasAoVivo) sincronizarPrevias();
 
   const ativas = transmissoesDaSala();
   if (ativas.length > 0) focarEm(ativas[0]); // ja tem gente no ar - foca na primeira automaticamente
@@ -833,8 +902,11 @@ function souAOrigem(chave) {
 function focarEm(chave) {
   if (chave === estado.focoAtual) return;
 
-  if (estado.focoAtual && !souAOrigem(estado.focoAtual)) {
-    pararDeAssistir(estado.focoAtual); // solta quem eu estava assistindo antes
+  // Com as previas ao vivo ligadas eu ja estou recebendo todo mundo, entao
+  // trocar de foco nao solta nada. Desligadas, solto o anterior na hora: e o
+  // que mantem uma conexao por vez em vez de N.
+  if (estado.focoAtual && !souAOrigem(estado.focoAtual) && !estado.previasAoVivo) {
+    pararDeAssistir(estado.focoAtual);
   }
 
   estado.focoAtual = chave;
@@ -1164,6 +1236,41 @@ function fecharSaidasDoCanal(canal) {
   });
 }
 
+// Previas ao vivo: o VIO conecta sob demanda de proposito — so com a transmissao
+// que voce esta olhando. Ligar isto troca esse contrato por "conecta com todas",
+// que e o unico jeito de ter imagem de verdade nas miniaturas. Custa banda de
+// quem transmite (uma conexao a mais por espectador, por transmissao), e por
+// isso nasce desligado e a folha de Ajustes diz o preco.
+function sincronizarPrevias() {
+  if (estado.previasAoVivo) {
+    transmissoesDaSala().forEach((chave) => {
+      if (souAOrigem(chave)) return;
+      if (estado.streamsDisponiveis.has(chave) || incomingPCs.has(chave)) return;
+      solicitarTransmissao(chave);
+    });
+  } else {
+    [...incomingPCs.keys()].forEach((chave) => {
+      if (chave === estado.focoAtual) return; // o que estou vendo fica
+      pararDeAssistir(chave);
+    });
+  }
+  renderizarTiraTransmissoes();
+}
+
+// Uma transmissao acabou de entrar no ar. Se eu nao estou vendo nada, passo a
+// ver essa — senao a pessoa fica encarando o aviso de "ninguem compartilhando"
+// sem nada pra clicar (a tira so aparece com duas ou mais transmissoes).
+// Se eu ja estava vendo alguma coisa, nao roubo o foco: so atualizo a tira.
+function ofereserTransmissaoNova(chave) {
+  if (estado.focoAtual) {
+    if (estado.previasAoVivo) sincronizarPrevias();
+    else renderizarTiraTransmissoes();
+    return;
+  }
+  focarEm(chave);
+  if (estado.previasAoVivo) sincronizarPrevias();
+}
+
 // Depois que uma transmissao some, escolhe a proxima pra mostrar — ou limpa a
 // moldura se nao sobrou nenhuma.
 function seguirParaProximaTransmissao(chaveQueSaiu) {
@@ -1405,7 +1512,7 @@ socket.on('share-started', ({ id }) => {
     if (estado.focoAtual) renderizarTiraTransmissoes();
     else focarEm(chave);
   } else {
-    renderizarTiraTransmissoes(); // aparece como opcao na tira — so conecta de verdade se alguem focar nela
+    ofereserTransmissaoNova(chave);
   }
 });
 
@@ -1437,7 +1544,7 @@ socket.on('camera-started', ({ id }) => {
     if (estado.focoAtual) renderizarTiraTransmissoes();
     else focarEm(chave);
   } else {
-    renderizarTiraTransmissoes();
+    ofereserTransmissaoNova(chave);
   }
 });
 
@@ -1851,8 +1958,14 @@ function atualizarBotaoMicrofone() {
   const naVoz = estado.voiceIds.has(socket.id);
   const mandando = naVoz && !estado.vozMudo && !estado.vozSurdo;
 
-  iconeMicrofone.classList.toggle('icone-microphone', mandando);
-  iconeMicrofone.classList.toggle('icone-microphone-slash', !mandando);
+  // Microfone e fone dizem "desligado" do MESMO jeito: o icone base continua o
+  // mesmo e a classe .cortado desenha o risco. Antes o microfone trocava pro SVG
+  // microphone-slash, cujo risco vai pro outro lado e nao e vermelho — dois
+  // botoes vizinhos significando a mesma coisa com desenhos diferentes.
+  // Fora da voz o botao fica neutro: ali ele convida a entrar, nao avisa de mudo.
+  iconeMicrofone.classList.add('icone-microphone');
+  iconeMicrofone.classList.remove('icone-microphone-slash');
+  btnMicrofone.classList.toggle('cortado', naVoz && !mandando);
   btnMicrofone.classList.toggle('ativo', mandando);
   btnMicrofone.setAttribute('aria-pressed', String(mandando));
   btnMicrofone.setAttribute(
@@ -1872,6 +1985,7 @@ function atualizarBotaoMicrofone() {
 
   if (medidorVozLocal) medidorVozLocal.classList.toggle('oculto', !naVoz);
   if (blocoMicrofone) blocoMicrofone.classList.toggle('oculto', !naVoz);
+  if (notaSemVoz) notaSemVoz.classList.toggle('oculto', naVoz);
 }
 
 // ---- ajustes do proprio microfone ----
@@ -1975,6 +2089,28 @@ function alternarMudoDe(peerId) {
   renderizarParticipantes();
 }
 
+// Volume de UMA pessoa, so pra mim: nao vai pro servidor, ela nao fica sabendo,
+// e some quando eu saio da sala — igual ao silenciar. Mexe no <audio> daquela
+// pessoa, entao nao encosta na conexao nem no volume das outras.
+const VOLUME_PADRAO_PESSOA = 100;
+
+function volumeDe(peerId) {
+  const v = estado.volumesLocais.get(peerId);
+  return v === undefined ? VOLUME_PADRAO_PESSOA : v;
+}
+
+function definirVolumeDe(peerId, valor) {
+  const limpo = Math.max(0, Math.min(100, Number(valor)));
+  if (limpo === VOLUME_PADRAO_PESSOA) estado.volumesLocais.delete(peerId);
+  else estado.volumesLocais.set(peerId, limpo);
+  aplicarVolumeEm(peerId);
+}
+
+function aplicarVolumeEm(peerId) {
+  const el = audiosVoz.get(peerId);
+  if (el) el.volume = volumeDe(peerId) / 100;
+}
+
 btnFone.addEventListener('click', alternarFone);
 
 rangeSensibilidade.addEventListener('input', () => {
@@ -2013,6 +2149,7 @@ function reproduzirVoz(peerId, stream) {
   }
   if (el.srcObject !== stream) el.srcObject = stream;
   el.muted = estado.vozSurdo || estado.mudosLocais.has(peerId);
+  el.volume = volumeDe(peerId) / 100;
   el.play().catch(() => {
     // navegador segurando o audio ate um gesto: o proprio botao de microfone
     // ja e um gesto, entao na pratica isso quase nao acontece
