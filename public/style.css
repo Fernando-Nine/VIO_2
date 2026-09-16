@@ -1426,8 +1426,10 @@ button:focus {
   color: var(--texto);
 }
 
+/* O nome e a informacao mais importante da linha: ele encurta com reticencias,
+   mas nunca desaparece. Sem este minimo ele chega a 11px e vira um risco. */
 .texto-participante {
-  min-width: 0;
+  min-width: 4ch;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1965,9 +1967,7 @@ button:focus {
 }
 
 .range-volume-pessoa {
-  width: 72px;
   height: 22px; /* alvo de toque: o polegar pega a faixa inteira, nao so o tracinho */
-  flex: none;
   accent-color: var(--marca);
   cursor: pointer;
 }
@@ -1977,18 +1977,19 @@ button:focus {
   cursor: default;
 }
 
-/* Em tela estreita a faixa nao cabe ao lado do nome — mas sumir com ela seria
-   tirar o controle justamente de quem usa no celular. Ela desce pra propria
-   linha e ocupa a largura toda, que ate pega melhor no polegar. */
-@media (max-width: 460px) {
-  .controles-participante {
-    flex-basis: 100%;
-    margin-top: 4px;
-  }
-  .range-volume-pessoa {
-    flex: 1;
-    width: auto;
-  }
+/* Os controles ficam SEMPRE na propria linha, sem media query. A largura que
+   importa aqui e a da folha, nao a da janela: no desktop ela vira painel lateral
+   de 420px, entao uma regra por largura de janela achava que havia espaco de
+   sobra e espremia tudo numa fileira so. O nome era o unico que cedia, e sobrava
+   uma lasca de 11px da primeira letra parecendo um risco em pe. */
+.controles-participante {
+  flex-basis: 100%;
+  margin-top: 4px;
+}
+
+.range-volume-pessoa {
+  flex: 1;
+  width: auto;
 }
 
 .btn-silenciar {

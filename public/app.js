@@ -131,6 +131,8 @@ const rangeEscala = document.getElementById('range-escala');
 const valorEscala = document.getElementById('valor-escala');
 const notaSurface = document.getElementById('nota-surface');
 const chkPrevias = document.getElementById('chk-previas');
+const chkGanhoAuto = document.getElementById('chk-ganho-auto');
+const blocoGanho = document.getElementById('bloco-ganho');
 const notaSemVoz = document.getElementById('nota-sem-voz');
 const abaVideo = document.getElementById('aba-video');
 const abaAudio = document.getElementById('aba-audio');
@@ -169,7 +171,8 @@ const estado = {
   micBruto: null, // o que sai do getUserMedia, antes do grafo de audio
   micEco: true, // cancelamento de eco
   micRuido: true, // supressao de ruido
-  micGanho: 1, // multiplicador do volume do microfone (0.2 a 3)
+  micGanhoAuto: true, // o navegador nivela sozinho (autoGainControl)
+  micGanho: 1, // multiplicador manual do volume — so vale com o automatico desligado
   micSensibilidade: 8, // portao: abaixo desse nivel o microfone nao transmite (0 = sempre aberto)
   micEntradaId: '', // deviceId do microfone escolhido ('' = padrao do sistema)
   saidaId: '', // deviceId da saida de audio ('' = padrao do sistema)
@@ -1406,22 +1409,79 @@ function desligarCamera() {
 // Trocar frontal/traseira sem derrubar a conexao: o que muda e a TRACK dentro
 // das PeerConnections que ja existem (replaceTrack), nao a conexao. Renegociar
 // aqui daria um piscar preto em quem esta assistindo, por nada.
+// As tentativas sao em ordem de teimosia. `exact` e o que realmente obriga o
+// navegador a trocar: com facingMode solto ele trata como preferencia e pode
+// devolver a mesma camera calado, que era o sintoma. O deviceId entra como
+// segunda via pra PC com duas webcams, onde facingMode nao significa nada.
+function tentativasDeVirar(querFrontal, idAtual, idsDisponiveis) {
+  const modo = querFrontal ? 'user' : 'environment';
+  const base = { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } };
+  const tentativas = [{ video: { ...base, facingMode: { exact: modo } }, audio: false }];
+
+  const outro = idsDisponiveis.find((id) => id && id !== idAtual);
+  if (outro) tentativas.push({ video: { ...base, deviceId: { exact: outro } }, audio: false });
+
+  tentativas.push({ video: { ...base, facingMode: modo }, audio: false }); // ultima chance
+  return tentativas;
+}
+
+let virandoCamera = false;
+
 async function virarCamera() {
-  if (!estado.cameraStream) return;
+  if (!estado.cameraStream || virandoCamera) return;
+  virandoCamera = true;
+  btnVirarCamera.disabled = true;
 
-  estado.cameraFrontal = !estado.cameraFrontal;
+  const antiga = estado.cameraStream.getVideoTracks()[0];
+  const idAntigo = antiga ? antiga.getSettings().deviceId : null;
+  const eraFrontal = estado.cameraFrontal;
 
-  let novoStream;
+  let ids = [];
   try {
-    novoStream = await navigator.mediaDevices.getUserMedia(restricaoDeCamera());
-  } catch (erro) {
-    estado.cameraFrontal = !estado.cameraFrontal; // desfaz: a camera de tras nao veio
-    mostrarAlerta('Não foi possível virar a câmera: ' + erro.message);
-    return;
+    ids = (await navigator.mediaDevices.enumerateDevices())
+      .filter((d) => d.kind === 'videoinput')
+      .map((d) => d.deviceId);
+  } catch { /* sem lista: sobra o facingMode */ }
+
+  // ORDEM OBRIGATORIA: fecha a atual ANTES de pedir a outra. No Android a
+  // camera e de uso exclusivo — com a frontal aberta, o pedido pela traseira
+  // devolve a frontal de volta em vez de dar erro, e o botao parecia morto.
+  if (antiga) antiga.stop();
+
+  let novoStream = null;
+  for (const restricao of tentativasDeVirar(!eraFrontal, idAntigo, ids)) {
+    try {
+      novoStream = await navigator.mediaDevices.getUserMedia(restricao);
+      break;
+    } catch { /* proxima tentativa */ }
+  }
+
+  // Nao veio nada: reabre a que estava, pra nao deixar a pessoa sem camera
+  // nenhuma depois de um toque que era so pra virar.
+  if (!novoStream) {
+    try {
+      novoStream = await navigator.mediaDevices.getUserMedia(restricaoDeCamera());
+      mostrarAlerta('Não consegui virar a câmera neste aparelho — voltei para a de antes.', 5000);
+    } catch (erro) {
+      estado.cameraStream = null;
+      desligarCamera();
+      mostrarAlerta('A câmera se perdeu ao virar: ' + erro.message, 5000);
+      virandoCamera = false;
+      btnVirarCamera.disabled = false;
+      return;
+    }
   }
 
   const novaTrack = novoStream.getVideoTracks()[0];
-  const antiga = estado.cameraStream.getVideoTracks()[0];
+  const cfg = novaTrack.getSettings();
+
+  // Se voltou a MESMA camera, o estado precisa dizer a verdade — senao o
+  // espelhamento inverte sozinho numa imagem que nao mudou.
+  const trocouDeFato = cfg.deviceId ? cfg.deviceId !== idAntigo : true;
+  estado.cameraFrontal = cfg.facingMode ? cfg.facingMode === 'user' : (trocouDeFato ? !eraFrontal : eraFrontal);
+  if (!trocouDeFato) {
+    mostrarAlerta('Este aparelho só oferece uma câmera para o navegador.', 4500);
+  }
 
   await Promise.all(
     [...outgoingPCs.entries()]
@@ -1432,14 +1492,15 @@ async function virarCamera() {
       })
   );
 
-  estado.cameraStream.removeTrack(antiga);
-  antiga.stop();
+  // O MESMO objeto MediaStream continua valendo, entao a moldura e as
+  // miniaturas nem ficam sabendo da troca — so as tracks por dentro mudam.
+  if (antiga) estado.cameraStream.removeTrack(antiga);
   estado.cameraStream.addTrack(novaTrack);
   novaTrack.addEventListener('ended', desligarCamera);
 
-  // A moldura segura o MESMO objeto MediaStream, entao o troca-troca de track
-  // ja aparece sozinho — so o espelhamento e que muda de lado.
   aplicarEspelhoDaCamera();
+  virandoCamera = false;
+  btnVirarCamera.disabled = false;
 }
 
 // Camera frontal espelhada (e o que a pessoa espera de uma selfie); traseira
@@ -1854,7 +1915,7 @@ function restricoesDoMicrofone() {
   const r = {
     echoCancellation: estado.micEco,
     noiseSuppression: estado.micRuido,
-    autoGainControl: true,
+    autoGainControl: estado.micGanhoAuto,
   };
   if (estado.micEntradaId) r.deviceId = { exact: estado.micEntradaId };
   return r;
@@ -1985,6 +2046,7 @@ function atualizarBotaoMicrofone() {
 
   if (medidorVozLocal) medidorVozLocal.classList.toggle('oculto', !naVoz);
   if (blocoMicrofone) blocoMicrofone.classList.toggle('oculto', !naVoz);
+  if (blocoGanho) aplicarVisibilidadeDoGanho();
   if (notaSemVoz) notaSemVoz.classList.toggle('oculto', naVoz);
 }
 
@@ -1995,7 +2057,7 @@ async function aplicarAjustesMicrofone() {
   const track = estado.micBruto.getAudioTracks()[0];
   if (!track) return;
   try {
-    await track.applyConstraints({ echoCancellation: estado.micEco, noiseSuppression: estado.micRuido });
+    await track.applyConstraints({ echoCancellation: estado.micEco, noiseSuppression: estado.micRuido, autoGainControl: estado.micGanhoAuto });
   } catch {
     // Navegador que nao troca isso num track ja aberto: pega um microfone novo.
     // So o no de fonte muda, entao as conexoes nem ficam sabendo.
@@ -2080,6 +2142,31 @@ rangeGanho.addEventListener('input', () => {
   estado.micGanho = Number(rangeGanho.value) / 100;
   if (noGanho) noGanho.gain.value = estado.micGanho;
   valorGanho.textContent = `${rangeGanho.value}%`;
+});
+
+// Ganho automatico e ganho manual fazem a MESMA coisa por caminhos diferentes:
+// o automatico e o navegador nivelando na captura, o manual e o no de ganho do
+// grafo. Deixar os dois ativos e um puxando o outro — a pessoa sobe o manual, o
+// automatico compensa pra baixo, e o resultado e um volume que respira sozinho.
+// Entao a barra manual so aparece quando o automatico esta desligado.
+function aplicarVisibilidadeDoGanho() {
+  blocoGanho.classList.toggle('oculto', estado.micGanhoAuto);
+}
+
+chkGanhoAuto.addEventListener('change', async () => {
+  estado.micGanhoAuto = chkGanhoAuto.checked;
+  aplicarVisibilidadeDoGanho();
+
+  // Voltando pro automatico, o no manual volta pra 1: senao o navegador
+  // nivelaria em cima de um sinal ja multiplicado por 2,5 e sobraria distorcao.
+  if (estado.micGanhoAuto) {
+    estado.micGanho = 1;
+    if (noGanho) noGanho.gain.value = 1;
+    rangeGanho.value = '100';
+    valorGanho.textContent = '100%';
+  }
+
+  await aplicarAjustesMicrofone();
 });
 
 function alternarMudoDe(peerId) {

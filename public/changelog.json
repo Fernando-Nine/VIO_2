@@ -1,5 +1,23 @@
 [
   {
+    "versao": "1.10.0",
+    "data": "2026-09-16",
+    "mudancas": [
+      {
+        "tipo": "corrigido",
+        "texto": "O botão de virar a câmera não trocava entre a frontal e a traseira. A câmera antiga continuava aberta na hora de pedir a nova — e no Android ela é de uso exclusivo, então o aparelho devolvia a mesma de volta, sem erro nenhum. Agora ela é fechada antes, e o pedido pela outra é obrigatório em vez de preferência."
+      },
+      {
+        "tipo": "corrigido",
+        "texto": "O nome de quem está na sala podia ser esmagado até virar um risco em pé. Com a chamada em curso a linha ganha o crachá de “compartilhando” e a faixa de volume, e o nome era o único item que cedia espaço."
+      },
+      {
+        "tipo": "adicionado",
+        "texto": "Ganho automático do microfone virou opção, em Ajustes › Áudio. Ligado, o navegador nivela seu volume sozinho e a barra manual fica escondida; desligado, você ajusta na mão. Os dois juntos brigavam, um compensando o outro."
+      }
+    ]
+  },
+  {
     "versao": "1.9.0",
     "data": "2026-09-16",
     "mudancas": [

@@ -7,6 +7,28 @@ segue [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAJOR.MINOR.PA
 O mesmo conteúdo fica disponível dentro do próprio app, tocando no número da versão na
 tela de entrada.
 
+## [1.10.0] - 2026-09-16
+
+### Corrigido
+- O botão de virar a câmera não trocava entre a frontal e a traseira. Eram duas
+  causas silenciosas juntas: `facingMode` solto é uma preferência, não uma
+  exigência, então o navegador podia devolver a mesma câmera sem dar erro; e a
+  câmera antiga continuava aberta na hora de pedir a nova, e no Android ela é de
+  uso exclusivo — com a frontal aberta, o pedido pela traseira devolve a frontal.
+  Agora a câmera atual é fechada antes, o pedido usa `exact`, e há recuo por
+  `deviceId`. Se mesmo assim só houver uma câmera, o app avisa em vez de fingir
+  que virou.
+- O nome de quem está na sala podia ser esmagado até virar um risco em pé de
+  11px. Com a chamada em curso a linha ganha o crachá de "compartilhando" e a
+  faixa de volume, e o nome era o único item que cedia espaço. Pior no
+  computador, onde a folha vira painel estreito mas a janela continua larga.
+
+### Adicionado
+- Ganho automático do microfone virou opção, em Ajustes › Áudio. Ligado (o
+  padrão), o navegador nivela seu volume sozinho e a barra de ganho manual fica
+  escondida — os dois juntos brigavam, um compensando o outro. Desligue para
+  ajustar o ganho na mão.
+
 ## [1.9.0] - 2026-09-16
 
 ### Corrigido

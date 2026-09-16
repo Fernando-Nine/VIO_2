@@ -3,7 +3,7 @@
 Arquivo vivo. O `CLAUDE.md` guarda as regras permanentes (e fica curto de propósito); **este
 guarda onde estamos**. Substitui o antigo `ESTADO-DO-PROJETO.md`, que ficou desatualizado.
 
-Última atualização: **16/09/2026** · Versão do app: **1.9.0**
+Última atualização: **16/09/2026** · Versão do app: **1.10.0**
 
 ---
 
@@ -180,6 +180,18 @@ lista que virou a 1.9.0. Dois achados valem registro porque são de método, nã
 
 O que o relato confirmou de bom: conexão entre amigos funcionou, voz funcionou, e ninguém
 esbarrou em NAT desta vez. O amigo com NAT simétrico continua sendo o caso do TURN.
+
+**Segunda rodada de relato** (16/09/2026, 1.10.0) — mais dois casos de falha silenciosa:
+
+- **Virar a câmera não fazia nada.** Duas causas somadas, nenhuma das duas dando erro:
+  `facingMode` solto é *preferência*, e a câmera antiga seguia aberta quando a nova era pedida.
+  No Android a câmera é de uso exclusivo, então o aparelho devolvia a frontal já aberta. Agora:
+  fecha primeiro, pede com `exact`, recua por `deviceId`, e **avisa** se só houver uma câmera em
+  vez de inverter o espelhamento de uma imagem que não mudou.
+- **O nome do participante virava um risco de 11px.** Media query por largura de *janela* não
+  serve aqui: acima de 860px a folha vira painel de 420px, então a regra achava que havia
+  espaço e espremia tudo numa fileira. Lição: nesta folha, o que manda é a largura dela, não a
+  da janela — os controles vão para a própria linha sempre.
 
 **Reconexão** (1.3.0) — queda de rede ou restart do servidor: o cliente volta sozinho para a
 sala, sem F5. O `socket.id` muda na volta, então todos os mapas indexados por id são refeitos

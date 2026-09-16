@@ -347,11 +347,23 @@
             <select id="select-entrada" class="select-campo"></select>
           </div>
 
-          <div class="rotulo-slider">
-            <label for="range-ganho">Ganho</label>
-            <b id="valor-ganho">100%</b>
+          <label class="linha-toggle" for="chk-ganho-auto">
+            <span class="texto-toggle">
+              <span class="titulo-toggle">Ganho automático</span>
+              <span class="sub-toggle">O navegador nivela seu volume sozinho</span>
+            </span>
+            <input id="chk-ganho-auto" type="checkbox" class="interruptor" checked />
+            <span class="trilho-interruptor" aria-hidden="true"></span>
+          </label>
+
+          <div id="bloco-ganho" class="oculto">
+            <div class="rotulo-slider">
+              <label for="range-ganho">Ganho manual</label>
+              <b id="valor-ganho">100%</b>
+            </div>
+            <input id="range-ganho" type="range" class="slider-marca" min="20" max="300" step="5" value="100" />
+            <p class="nota-avancado">Suba se estiverem te ouvindo baixo. Passar muito de 100% também levanta o barulho de fundo junto.</p>
           </div>
-          <input id="range-ganho" type="range" class="slider-marca" min="20" max="300" step="5" value="100" />
 
           <div class="rotulo-slider">
             <label for="range-sensibilidade">Sensibilidade</label>

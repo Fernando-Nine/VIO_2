@@ -43,6 +43,9 @@ Decisão explícita de escopo, não limitação temporária:
   pra quem focou nela. Pega **só vídeo**: microfone é do canal de voz. Os ajustes de
   qualidade são da tela e não valem pra ela (teto próprio, `BITRATE_CAMERA`). Virar
   frontal/traseira usa `replaceTrack`, nunca renegociação — senão pisca preto em quem assiste.
+  **A câmera atual é fechada antes de pedir a outra**: no Android ela é de uso exclusivo, e com
+  a frontal aberta o pedido pela traseira devolve a frontal, calado. O pedido usa `exact` —
+  `facingMode` solto é preferência, e o navegador pode ignorar sem erro.
 - Na malha de voz, **quem tem o `socket.id` menor faz a oferta**; o outro espera. Sem isso as
   duas pontas travam em `have-local-offer`.
 - **Grafo de áudio do microfone:** `fonte → ganhoUsuario → analisador → ganhoPortão → destino`,
@@ -116,7 +119,7 @@ com o mesmo conteúdo: `package.json`, `@CHANGELOG.md` e `@public/changelog.json
 app exibe quando se toca no número da versão) — **[HOOK]**: o commit falha se `version` mudar
 sem os outros dois. O app lê a versão de `/api/version`, servida a partir do `package.json`.
 
-Semver: correção = PATCH, feature nova = MINOR. Versão atual: 1.9.0.
+Semver: correção = PATCH, feature nova = MINOR. Versão atual: 1.10.0.
 
 ## Estrutura de pastas
 
