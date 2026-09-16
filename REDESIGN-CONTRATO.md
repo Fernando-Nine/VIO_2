@@ -1,5 +1,12 @@
 # Contrato de DOM — redesenho visual do VIO
 
+> **Estado em 15/09/2026:** o redesenho do V0 já foi integrado, então este arquivo deixou de
+> ser um *briefing* e virou **referência**: a lista do que o `app.js` exige do HTML. Serve pra
+> duas coisas — não quebrar nada ao mexer no `index.html`, e montar o pedido caso o V0 volte a
+> ser usado numa rodada futura. A arquitetura agora é escrita aqui, não encomendada.
+>
+> A seção 4 (prompt pronto pro V0) só é útil nesse segundo caso.
+
 O `public/app.js` (1183 linhas) manipula a interface por **id**, **classe** e **seletor**.
 Se o markup novo mudar qualquer nome desta lista, a funcionalidade quebra em silêncio — sem
 erro no console, só um botão que não responde.
@@ -43,14 +50,16 @@ Todos consultados via `getElementById`. Ausente = `null` = erro em tempo de exec
 `icone-volume` · `range-volume` · `btn-alternar-previa` · `icone-previa` · `btn-tela-cheia`
 
 **Rodapé**
-`btn-ajustes` · `btn-compartilhar`
+`btn-ajustes` · `btn-microfone` · `icone-microfone` · `btn-compartilhar`
 
 **Folha "Sobre a sala"**
 `folha-info-sala` · `btn-fechar-info-sala` · `texto-codigo-completo` · `texto-duracao-sala` ·
 `texto-ping-completo` · `btn-copiar-link`
 
 **Folha "Quem está na sala"**
-`painel-participantes` · `btn-fechar-participantes` · `lista-participantes`
+`painel-participantes` · `btn-fechar-participantes` · `btn-limite-sala` · `medidor-voz-local` ·
+`lista-participantes` (cada `<li>` leva `data-id` com o socket id — é por ele que o medidor
+acha o avatar de quem está falando)
 
 **Folha "Ajustes"**
 `painel-avancado` · `btn-fechar-avancado` · `rotulo-chk-audio` · `chk-audio` ·

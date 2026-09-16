@@ -729,6 +729,12 @@ button:focus {
   background-color: #000;
 }
 
+/* Camera frontal espelhada: e o que a pessoa espera de uma selfie. Vale SO pra
+   a propria previa — quem assiste recebe a imagem como ela e. */
+#video-remoto.espelhado {
+  transform: scaleX(-1);
+}
+
 /* placeholder */
 .overlay-placeholder {
   position: absolute;
@@ -1133,7 +1139,22 @@ button:focus {
 
 .btn-compartilhar {
   flex: 1;
+  min-width: 0;
   margin-top: 0;
+  padding: 0 16px;
+}
+
+/* Num celular o rodape tem ajustes, microfone, fone e camera antes do botao de
+   compartilhar — nao sobra largura pro texto, e ele sairia cortado. Entao aqui
+   ele e so o icone (o aria-label/title continuam dizendo o que faz) e o rotulo
+   volta quando a tela permite. */
+.btn-compartilhar .rotulo-botao { display: none; }
+
+@media (min-width: 560px) {
+  .btn-compartilhar {
+    padding: 0 24px;
+  }
+  .btn-compartilhar .rotulo-botao { display: inline; }
 }
 
 .btn-compartilhar.compartilhando {
@@ -1780,4 +1801,122 @@ button:focus {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+/* ============================================================
+   Botão de ajuda ("?") — explica o teto de pessoas da sala.
+   O texto vive no title: aparece no hover do desktop, e no toque
+   o app.js mostra o mesmo texto como alerta.
+   ============================================================ */
+.btn-ajuda {
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  margin-right: 8px;
+  border: 1px solid var(--borda-forte);
+  border-radius: var(--raio-full);
+  background: transparent;
+  color: var(--texto-fraco);
+  font: 600 13px/1 inherit;
+  cursor: pointer;
+  flex: none;
+}
+
+.btn-ajuda:hover,
+.btn-ajuda:focus-visible {
+  color: var(--texto);
+  border-color: var(--borda-marca);
+}
+
+/* O medidor fica acima da lista, com respiro, só enquanto há voz. */
+.corpo-folha > .medidor-voz {
+  margin-bottom: 14px;
+}
+
+/* Marcador de "está na conversa por voz" na lista de participantes.
+   Discreto: quem está falando aparece pelo anel no avatar, não por aqui. */
+.nome-participante > .icone {
+  width: 15px;
+  height: 15px;
+  margin-left: 8px;
+  vertical-align: -2px;
+  opacity: 0.65;
+}
+
+/* Estado "cortado": risco diagonal sobre o ícone, pra dizer "desligado" sem
+   precisar de um SVG novo. Usado no fone e no silenciar de cada participante. */
+.cortado {
+  position: relative;
+  color: var(--texto-fantasma);
+}
+
+.cortado::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 60%;
+  height: 2px;
+  border-radius: 2px;
+  background-color: var(--perigo);
+  transform: translate(-50%, -50%) rotate(-45deg);
+  pointer-events: none;
+}
+
+/* Silenciar uma pessoa específica, na lista de participantes. */
+.btn-silenciar {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border: 1px solid transparent;
+  border-radius: var(--raio-full);
+  background: transparent;
+  color: var(--texto-fraco);
+  cursor: pointer;
+}
+
+.btn-silenciar:hover,
+.btn-silenciar:focus-visible {
+  color: var(--texto);
+  border-color: var(--borda-forte);
+}
+
+.btn-silenciar[aria-pressed="true"] {
+  color: var(--perigo);
+}
+
+/* Seletor de dispositivo (entrada e saída de áudio). */
+.linha-select {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.linha-select > label {
+  flex: none;
+  min-width: 56px;
+  font-size: 13px;
+  color: var(--texto-fraco);
+}
+
+.select-campo {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-sm);
+  background-color: var(--superficie-fraca);
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.select-campo:focus-visible {
+  border-color: var(--borda-marca);
+  outline: none;
 }

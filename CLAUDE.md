@@ -18,13 +18,38 @@ Decisão explícita de escopo, não limitação temporária:
 ## Arquitetura
 
 - `@server.js` — Express + Socket.IO. Estado das salas em memória (`Map`), some no restart.
-  Eventos: `join-room`, `start-share`, `stop-share`, `signal`, `ping-teste`.
+  Eventos: `join-room`, `start-share`, `stop-share`, `start-voice`, `stop-voice`, `signal`,
+  `ping-teste`. `sharingIds` e `voiceIds` são listas separadas: tela e voz são independentes.
 - `@public/app.js` — o cliente inteiro (~1200 linhas, JS puro, sem build). Uma
   `RTCPeerConnection` por par **por transmissão efetivamente assistida** — quem compartilha
   só conecta a quem está de fato olhando.
 - `@public/style.css` — CSS único, mobile-first.
-- Voz e câmera (quando existirem) usam **conexões separadas** das de tela. Não misturar
-  tracks de tela com tracks de microfone/câmera na mesma PeerConnection.
+- **Reconexão:** na volta o `socket.id` **muda**, e todos os mapas do cliente
+  (`participantes`, `sharingIds`, PCs, filas de ICE) são indexados por ele — nenhum sobrevive.
+  O `localStream` sobrevive de propósito: derrubá-lo faria o navegador pedir a tela de novo.
+- **Voz** (`vozPCs`) usa conexões **separadas** das de tela — nunca misturar tracks de
+  microfone com tracks de tela na mesma PeerConnection. É **uma** conexão por par,
+  bidirecional, e **sempre-para-todos** (a tela é sob demanda). Daí o teto de ~6.
+- **`payload.canal`** (`'tela' | 'voz' | 'camera'`) é obrigatório na sinalização: o mesmo par
+  de pessoas pode ter várias conexões ao mesmo tempo, e sem o canal um candidato ICE de voz
+  iria parar numa conexão de tela e a mataria em silêncio. O `papel` separa ida/volta da
+  tela; o `canal` separa tela, voz e câmera.
+- **Chave composta `"socketId|canal"`** (`chaveDe`/`partesDaChave`): quem transmite tela e
+  câmera ao mesmo tempo precisa de duas conexões, então nada que descreve uma transmissão
+  pode ser indexado só pelo `socket.id`. Vale pra `streamsDisponiveis`, `focoAtual`, PCs e
+  filas de ICE — **menos** a voz, que é uma conexão por par e continua indexada pelo id.
+- **Câmera** (`canal: 'camera'`) segue o desenho da voz — lista própria no servidor
+  (`cameraIds`), conexões separadas —, mas o comportamento da **tela**: sob demanda, só sai
+  pra quem focou nela. Pega **só vídeo**: microfone é do canal de voz. Os ajustes de
+  qualidade são da tela e não valem pra ela (teto próprio, `BITRATE_CAMERA`). Virar
+  frontal/traseira usa `replaceTrack`, nunca renegociação — senão pisca preto em quem assiste.
+- Na malha de voz, **quem tem o `socket.id` menor faz a oferta**; o outro espera. Sem isso as
+  duas pontas travam em `have-local-offer`.
+- **Grafo de áudio do microfone:** `fonte → ganhoUsuario → analisador → ganhoPortão → destino`,
+  montado uma vez. Trocar de microfone ou de restrição só troca o nó de **fonte** — o destino
+  não muda, então `estado.vozStream` é estável e as PeerConnections não são renegociadas. O
+  analisador fica **antes** do portão, senão o portão fechado zeraria o medidor e nunca
+  reabriria. `track.enabled` é só mudo/surdez; o portão corta por ganho, com rampa.
 
 ## Stack e convenções
 
@@ -34,10 +59,17 @@ Decisão explícita de escopo, não limitação temporária:
 - O rate limiter é feito à mão de propósito (`criarLimitador`, em `@server.js`) — não trocar
   por biblioteca.
 - Ícones: SVGs já existentes em `public/icons/`. Não gerar ícone de interface novo.
-- Cores: `#2727F5` para interação; teal reservado exclusivamente ao status "ao vivo".
+- Cores: `#2727F5` para interação; teal (`--tela-glow`) significa **acontecendo agora** —
+  o status "ao vivo" e o anel de quem está falando. Não usar para mais nada.
 - Fonte Poppins; leituras técnicas (código da sala, ping) em monoespaçada.
-- Áudio de tela: `echoCancellation`, `noiseSuppression` e `autoGainControl` **sempre false**.
-  É regra de produto, não preferência — ligados, causam oscilação de volume.
+- **Áudio de tela e voz são coisas separadas, e nunca se misturam:**
+  - **Tela** (`getDisplayMedia`): `echoCancellation`, `noiseSuppression` e `autoGainControl`
+    **sempre false**, e nada de ganho, portão ou grafo. Regra de produto, não preferência —
+    ligados, causam oscilação de volume no que devia sair exatamente como é.
+  - **Voz** (`getUserMedia`): os três **ligados**, mais ganho, portão de ruído e escolha de
+    microfone. É o caso pra que esses processamentos existem.
+  - Ajuste de microfone nunca vale pro som da tela. A **saída** de áudio é a única exceção:
+    ela vale pra tudo que a pessoa ouve, e por isso fica em bloco próprio na folha de Ajustes.
 - Alvo de toque mínimo: 44px.
 
 ## Comandos
@@ -57,8 +89,9 @@ de fechar qualquer tarefa que toque em mídia:
 ## Fora de limite
 
 Regras **[HOOK]** são cumpridas por `@.claude/hooks/guard.js`, não por adesão a este texto.
-Texto aqui é pedido; hook é portão. Foi a falta deles que deixou um export inteiro do V0 entrar
-no repositório por um `git add .`.
+Texto aqui é pedido; hook é portão. O caso do V0 mostra a diferença: o export **deve** ficar na
+pasta, é a referência visual de onde o redesenho sai — o que não pode é ele ser commitado junto
+num `git add .`. O hook separa as duas coisas sem depender de ninguém lembrar.
 
 - **[HOOK]** Nunca adicionar dependência npm sem aprovação explícita.
 - **[HOOK]** Nunca commitar `.env`, credencial de TURN ou qualquer segredo.
@@ -78,7 +111,7 @@ com o mesmo conteúdo: `package.json`, `@CHANGELOG.md` e `@public/changelog.json
 app exibe quando se toca no número da versão) — **[HOOK]**: o commit falha se `version` mudar
 sem os outros dois. O app lê a versão de `/api/version`, servida a partir do `package.json`.
 
-Semver: correção = PATCH, feature nova = MINOR. Versão atual: 1.2.0.
+Semver: correção = PATCH, feature nova = MINOR. Versão atual: 1.8.0.
 
 ## Estrutura de pastas
 
@@ -99,25 +132,22 @@ vio/
     index.html
     app.js             cliente inteiro
     style.css
+    sw.js              service worker — nunca encosta em /socket.io/ nem em sala
+    manifest.json      PWA
+    icon-*.png         ícones do PWA (provisórios, ver @ESTADO.md)
     changelog.json     espelho do CHANGELOG.md, lido pelo app
-    icons/*.svg
+    icons/*.svg        ícones de interface (mask-image)
 ```
 
 ## Roadmap — nesta ordem
 
-1. **Reconexão** (em aberto, prioridade atual). O Render free hiberna e reinicia, e o estado
-   das salas é em memória. O cliente precisa detectar o `disconnect`, refazer `join-room`
-   sozinho e reconstruir as PeerConnections. ICE restart sozinho não resolve: depois do
-   restart a sala não existe mais no servidor.
-2. **PWA instalável**. `manifest.json` + service worker mínimo. O SW cacheia só o shell
-   (html/css/js/ícones), **nunca** `/socket.io/` nem estado de sala. Estratégia network-first.
-3. **Chat de voz**. Conexões separadas; sempre-para-todos (diferente da tela, que é sob
-   demanda) — é daí que vem o teto de ~6 pessoas. Microfone usa processamento **ligado**,
-   o oposto do áudio de tela.
-4. **Câmera**. Conexões separadas; troca frontal/traseira no celular.
-5. **TURN**. Ligado por variável de ambiente, com credenciais efêmeras. Só depois de 1–4.
-6. **Tauri + WASAPI**. Não é "empacotar o front-end": exige captura de áudio por processo em
+1. **TURN**. Ligado por variável de ambiente, com credenciais efêmeras. Já há um caso
+   confirmado de quem não conecta sem ele (NAT simétrico) — ver `@ESTADO.md`. É o item que
+   mais muda a vida de quem hoje simplesmente não consegue usar o VIO.
+2. **Tauri + WASAPI**. Não é "empacotar o front-end": exige captura de áudio por processo em
    Rust e injetar esse áudio na PeerConnection da WebView2. É o item mais caro da lista.
+
+Reconexão (1.3.0), PWA (1.4.0), chat de voz (1.5.0) e câmera (1.8.0) saíram daqui — estão implementados.
 
 ## Segurança — pendências já mapeadas
 

@@ -1,63 +1,262 @@
 [
   {
+    "versao": "1.8.0",
+    "data": "2026-09-15",
+    "mudancas": [
+      {
+        "tipo": "adicionado",
+        "texto": "Câmera. O botão fica no rodapé, ao lado do microfone, e liga só o vídeo — o microfone continua sendo da conversa por voz, com os ajustes dele."
+      },
+      {
+        "tipo": "adicionado",
+        "texto": "Dá pra estar com a tela e a câmera no ar ao mesmo tempo: as duas aparecem separadas na tira de transmissões, e a da câmera vem marcada como tal."
+      },
+      {
+        "tipo": "adicionado",
+        "texto": "No celular com mais de uma câmera, um botão vira entre a frontal e a traseira sem derrubar quem está assistindo. A frontal aparece espelhada na sua prévia, como numa selfie; quem assiste vê a imagem como ela é."
+      },
+      {
+        "tipo": "adicionado",
+        "texto": "A lista de participantes mostra quem está com a câmera ligada."
+      },
+      {
+        "tipo": "alterado",
+        "texto": "Como a tela, a câmera é sob demanda: ela só sai do seu computador para quem escolheu vê-la. Diferente da voz, que vai sempre para a sala toda."
+      },
+      {
+        "tipo": "alterado",
+        "texto": "Em tela estreita, o botão de compartilhar mostra só o ícone. O texto não cabia junto dos botões do rodapé e vinha saindo cortado; ele volta assim que há largura para ele."
+      }
+    ]
+  },
+  {
+    "versao": "1.7.1",
+    "data": "2026-09-15",
+    "mudancas": [
+      {
+        "tipo": "corrigido",
+        "texto": "A escolha da saída de áudio estava dentro dos ajustes do microfone, o que dava a entender que valia só para a conversa. Ela vale para tudo que você ouve — conversa e som da tela — e agora fica em bloco próprio, disponível mesmo para quem só assiste."
+      }
+    ]
+  },
+  {
+    "versao": "1.7.0",
+    "data": "2026-09-15",
+    "mudancas": [
+      {
+        "tipo": "adicionado",
+        "texto": "Dá pra escolher qual microfone usar e, no Chrome e derivados, por onde o som sai — fone, caixa ou monitor."
+      },
+      {
+        "tipo": "adicionado",
+        "texto": "Controle de ganho do microfone: se estiverem te ouvindo baixo, agora dá pra levantar sem mexer no sistema."
+      },
+      {
+        "tipo": "alterado",
+        "texto": "O corte da sensibilidade ficou suave. Antes o microfone era desligado de vez quando você parava de falar, o que cortava seco; agora o volume desce em rampa."
+      },
+      {
+        "tipo": "alterado",
+        "texto": "Trocar de microfone ou mexer em eco e ruído não derruba mais a conversa — a conexão continua de pé enquanto o ajuste acontece."
+      }
+    ]
+  },
+  {
+    "versao": "1.6.0",
+    "data": "2026-09-15",
+    "mudancas": [
+      {
+        "tipo": "adicionado",
+        "texto": "Botão de fone separado do microfone: dá pra calar só o seu microfone, ou silenciar a conversa inteira — microfone e áudio de uma vez."
+      },
+      {
+        "tipo": "adicionado",
+        "texto": "Silenciar uma pessoa específica, só pra você, direto na lista de participantes. A pessoa não fica sabendo."
+      },
+      {
+        "tipo": "adicionado",
+        "texto": "Ajustes do seu próprio microfone: sensibilidade, cancelamento de eco e supressão de ruído, cada um configurando o seu."
+      },
+      {
+        "tipo": "corrigido",
+        "texto": "Voltar a ouvir a conversa deixava o microfone mudo mesmo sem você ter pedido. Agora ele volta como estava antes."
+      }
+    ]
+  },
+  {
+    "versao": "1.5.0",
+    "data": "2026-09-15",
+    "mudancas": [
+      {
+        "tipo": "adicionado",
+        "texto": "Conversa por voz na sala. O botão de microfone no rodapé entra na conversa; tocando de novo você fica mudo, mas continua ouvindo todo mundo."
+      },
+      {
+        "tipo": "adicionado",
+        "texto": "O avatar de quem está falando ganha um anel, e a folha \"Quem está na sala\" mostra o nível do seu próprio microfone — dá pra conferir se ele está pegando."
+      },
+      {
+        "tipo": "adicionado",
+        "texto": "Um \"?\" ao lado de \"Quem está na sala\" explica por que existe um limite de pessoas por sala."
+      },
+      {
+        "tipo": "alterado",
+        "texto": "O teal deixa de ser exclusivo do status \"ao vivo\" e passa a significar \"acontecendo agora\": vale também para quem está falando."
+      },
+      {
+        "tipo": "corrigido",
+        "texto": "O botão \"Ativar o som\" aparecia o tempo todo desde a 1.4.0, mesmo sem nada para desbloquear. Agora só aparece quando o navegador realmente segurou o áudio — e destrava tanto o vídeo quanto as vozes da conversa."
+      }
+    ]
+  },
+  {
+    "versao": "1.4.0",
+    "data": "2026-09-15",
+    "mudancas": [
+      {
+        "tipo": "adicionado",
+        "texto": "O VIO agora é instalável: dá para adicionar à tela inicial do celular ou instalar como aplicativo no computador, e ele abre em janela própria. O ícone é provisório — a própria marca da tela de entrada ampliada — até a arte definitiva existir."
+      },
+      {
+        "tipo": "adicionado",
+        "texto": "A tela de entrada abre mesmo sem internet. Entrar numa sala continua exigindo conexão, naturalmente: o que fica disponível offline é só a casca do app."
+      }
+    ]
+  },
+  {
+    "versao": "1.3.0",
+    "data": "2026-09-15",
+    "mudancas": [
+      {
+        "tipo": "adicionado",
+        "texto": "Reconexão automática. Se a rede oscilar ou o servidor reiniciar, o VIO volta sozinho para a sala — antes só resolvia atualizando a página."
+      },
+      {
+        "tipo": "adicionado",
+        "texto": "Quem está compartilhando volta compartilhando: a tela capturada sobrevive à queda, então o navegador não pergunta de novo o que compartilhar."
+      },
+      {
+        "tipo": "adicionado",
+        "texto": "Aviso na tela durante a reconexão e nova tentativa automática, com espera crescente, quando o servidor está ocupado demais para receber de volta."
+      }
+    ]
+  },
+  {
     "versao": "1.2.0",
     "data": "2026-08-24",
     "mudancas": [
-      { "tipo": "alterado", "texto": "Cada transmissão agora só se conecta a quem está de fato assistindo ela no momento, em vez de ir automaticamente para a sala inteira — usa menos banda quando várias pessoas compartilham ao mesmo tempo." },
-      { "tipo": "corrigido", "texto": "O brilho ao redor do vídeo não desaparecia mais com a inatividade nem em tela cheia, atrapalhando a visualização." },
-      { "tipo": "adicionado", "texto": "Aviso na tela quando uma conexão específica falha (comum em redes mais restritas), em vez de só ficar com a tela preta sem explicação." },
-      { "tipo": "adicionado", "texto": "Licença AGPLv3 e README reescrito como apresentação do projeto." }
+      {
+        "tipo": "alterado",
+        "texto": "Cada transmissão agora só se conecta a quem está de fato assistindo ela no momento, em vez de ir automaticamente para a sala inteira — usa menos banda quando várias pessoas compartilham ao mesmo tempo."
+      },
+      {
+        "tipo": "corrigido",
+        "texto": "O brilho ao redor do vídeo não desaparecia mais com a inatividade nem em tela cheia, atrapalhando a visualização."
+      },
+      {
+        "tipo": "adicionado",
+        "texto": "Aviso na tela quando uma conexão específica falha (comum em redes mais restritas), em vez de só ficar com a tela preta sem explicação."
+      },
+      {
+        "tipo": "adicionado",
+        "texto": "Licença AGPLv3 e README reescrito como apresentação do projeto."
+      }
     ]
   },
   {
     "versao": "1.1.0",
     "data": "2026-08-23",
     "mudancas": [
-      { "tipo": "seguranca", "texto": "Limite de criação de salas e de mensagens por conexão, validação de origem no Socket.IO." },
-      { "tipo": "adicionado", "texto": "Número de versão e este histórico de mudanças, direto no app." }
+      {
+        "tipo": "seguranca",
+        "texto": "Limite de criação de salas e de mensagens por conexão, validação de origem no Socket.IO."
+      },
+      {
+        "tipo": "adicionado",
+        "texto": "Número de versão e este histórico de mudanças, direto no app."
+      }
     ]
   },
   {
     "versao": "1.0.1",
     "mudancas": [
-      { "tipo": "corrigido", "texto": "As folhas (Ajustes, Participantes, Sobre a sala) continuavam clicáveis mesmo fechadas no computador, roubando clique de outros botões." }
+      {
+        "tipo": "corrigido",
+        "texto": "As folhas (Ajustes, Participantes, Sobre a sala) continuavam clicáveis mesmo fechadas no computador, roubando clique de outros botões."
+      }
     ]
   },
   {
     "versao": "1.0.0",
     "mudancas": [
-      { "tipo": "alterado", "texto": "Interface refeita do zero, mobile-first: alvos de toque maiores, folhas deslizantes no lugar de menus apertados, fonte Poppins." },
-      { "tipo": "adicionado", "texto": "Seletor de transmissões com miniatura de vídeo ao vivo de cada pessoa compartilhando, não só o nome." },
-      { "tipo": "corrigido", "texto": "Estouro de tela para os lados em telas estreitas." }
+      {
+        "tipo": "alterado",
+        "texto": "Interface refeita do zero, mobile-first: alvos de toque maiores, folhas deslizantes no lugar de menus apertados, fonte Poppins."
+      },
+      {
+        "tipo": "adicionado",
+        "texto": "Seletor de transmissões com miniatura de vídeo ao vivo de cada pessoa compartilhando, não só o nome."
+      },
+      {
+        "tipo": "corrigido",
+        "texto": "Estouro de tela para os lados em telas estreitas."
+      }
     ]
   },
   {
     "versao": "0.5.0",
     "mudancas": [
-      { "tipo": "alterado", "texto": "Rebrand de Tela Junto para VIO." },
-      { "tipo": "adicionado", "texto": "Configuração pronta para publicar no Render." }
+      {
+        "tipo": "alterado",
+        "texto": "Rebrand de Tela Junto para VIO."
+      },
+      {
+        "tipo": "adicionado",
+        "texto": "Configuração pronta para publicar no Render."
+      }
     ]
   },
   {
     "versao": "0.3.0",
     "mudancas": [
-      { "tipo": "adicionado", "texto": "Mais de uma pessoa pode compartilhar a tela ao mesmo tempo na mesma sala." },
-      { "tipo": "corrigido", "texto": "Conexão quebrava quando duas pessoas compartilhavam uma para a outra simultaneamente." }
+      {
+        "tipo": "adicionado",
+        "texto": "Mais de uma pessoa pode compartilhar a tela ao mesmo tempo na mesma sala."
+      },
+      {
+        "tipo": "corrigido",
+        "texto": "Conexão quebrava quando duas pessoas compartilhavam uma para a outra simultaneamente."
+      }
     ]
   },
   {
     "versao": "0.2.0",
     "mudancas": [
-      { "tipo": "adicionado", "texto": "Prévia da própria tela para quem compartilha, com opção de ocultar." },
-      { "tipo": "adicionado", "texto": "Volume individual e tela cheia para quem assiste." },
-      { "tipo": "adicionado", "texto": "Sons de início e fim de compartilhamento, indicador de ping." },
-      { "tipo": "corrigido", "texto": "Áudio da tela vinha com cancelamento de eco e ganho automático ligados por padrão, causando oscilação de volume — desligados." }
+      {
+        "tipo": "adicionado",
+        "texto": "Prévia da própria tela para quem compartilha, com opção de ocultar."
+      },
+      {
+        "tipo": "adicionado",
+        "texto": "Volume individual e tela cheia para quem assiste."
+      },
+      {
+        "tipo": "adicionado",
+        "texto": "Sons de início e fim de compartilhamento, indicador de ping."
+      },
+      {
+        "tipo": "corrigido",
+        "texto": "Áudio da tela vinha com cancelamento de eco e ganho automático ligados por padrão, causando oscilação de volume — desligados."
+      }
     ]
   },
   {
     "versao": "0.1.0",
     "mudancas": [
-      { "tipo": "adicionado", "texto": "Primeira versão: compartilhamento de tela com controle de qualidade e áudio ao vivo." }
+      {
+        "tipo": "adicionado",
+        "texto": "Primeira versão: compartilhamento de tela com controle de qualidade e áudio ao vivo."
+      }
     ]
   }
 ]

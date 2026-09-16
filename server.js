@@ -105,13 +105,20 @@ function obterIp(socket) {
 }
 
 // Estado das salas, tudo em memoria (some quando o servidor reinicia).
-// rooms: Map<roomId, { participants: Map<socketId, {name}>, sharingIds: Set<socketId>, criadaEm: number }>
+// rooms: Map<roomId, { participants: Map<socketId, {name}>, sharingIds: Set<socketId>,
+//                      voiceIds: Set<socketId>, cameraIds: Set<socketId>, criadaEm: number }>
+//
+// sharingIds, voiceIds e cameraIds sao listas separadas de proposito: os tres sao
+// canais independentes. Da pra estar na voz sem compartilhar nada, ligar a camera
+// sem entrar na voz, ou compartilhar tela e camera ao mesmo tempo.
 const rooms = new Map();
 
 function roomState(room) {
   return {
     participants: [...room.participants.entries()].map(([id, p]) => ({ id, name: p.name })),
     sharingIds: [...room.sharingIds],
+    voiceIds: [...room.voiceIds],
+    cameraIds: [...room.cameraIds],
     criadaEm: room.criadaEm,
   };
 }
@@ -140,7 +147,7 @@ io.on('connection', (socket) => {
     socket.join(roomId);
 
     if (!rooms.has(roomId)) {
-      rooms.set(roomId, { participants: new Map(), sharingIds: new Set(), criadaEm: Date.now() });
+      rooms.set(roomId, { participants: new Map(), sharingIds: new Set(), voiceIds: new Set(), cameraIds: new Set(), criadaEm: Date.now() });
     }
     const room = rooms.get(roomId);
     room.participants.set(socket.id, { name: name.trim().slice(0, 40) });
@@ -167,6 +174,44 @@ io.on('connection', (socket) => {
     if (!room || !room.sharingIds.has(socket.id)) return;
     room.sharingIds.delete(socket.id);
     io.to(currentRoomId).emit('share-stopped', { id: socket.id });
+  });
+
+  // Voz: mesma mecanica de start-share/stop-share, lista separada. Ao contrario
+  // da tela — que so conecta a quem esta de fato assistindo — a voz e sempre
+  // para todos que estao nela, e e dai que vem o teto de ~6 pessoas por sala.
+  socket.on('start-voice', () => {
+    if (!limitarAcoesDeSala(socket.id)) return;
+    const room = rooms.get(currentRoomId);
+    if (!room) return;
+    room.voiceIds.add(socket.id);
+    io.to(currentRoomId).emit('voice-started', { id: socket.id });
+  });
+
+  socket.on('stop-voice', () => {
+    if (!limitarAcoesDeSala(socket.id)) return;
+    const room = rooms.get(currentRoomId);
+    if (!room || !room.voiceIds.has(socket.id)) return;
+    room.voiceIds.delete(socket.id);
+    io.to(currentRoomId).emit('voice-stopped', { id: socket.id });
+  });
+
+  // Camera: lista propria, mesma mecanica. Ao contrario da voz — que e
+  // sempre-para-todos — a camera e SOB DEMANDA como a tela: so conecta com quem
+  // de fato pediu pra ver. Video custa caro demais pra mandar sem ninguem olhar.
+  socket.on('start-camera', () => {
+    if (!limitarAcoesDeSala(socket.id)) return;
+    const room = rooms.get(currentRoomId);
+    if (!room) return;
+    room.cameraIds.add(socket.id);
+    io.to(currentRoomId).emit('camera-started', { id: socket.id });
+  });
+
+  socket.on('stop-camera', () => {
+    if (!limitarAcoesDeSala(socket.id)) return;
+    const room = rooms.get(currentRoomId);
+    if (!room || !room.cameraIds.has(socket.id)) return;
+    room.cameraIds.delete(socket.id);
+    io.to(currentRoomId).emit('camera-stopped', { id: socket.id });
   });
 
   // Relay generico de sinalizacao WebRTC (offer / answer / ice candidate).
@@ -197,6 +242,16 @@ io.on('connection', (socket) => {
     if (room.sharingIds.has(socket.id)) {
       room.sharingIds.delete(socket.id);
       socket.to(currentRoomId).emit('share-stopped', { id: socket.id });
+    }
+
+    if (room.voiceIds.has(socket.id)) {
+      room.voiceIds.delete(socket.id);
+      socket.to(currentRoomId).emit('voice-stopped', { id: socket.id });
+    }
+
+    if (room.cameraIds.has(socket.id)) {
+      room.cameraIds.delete(socket.id);
+      socket.to(currentRoomId).emit('camera-stopped', { id: socket.id });
     }
 
     socket.to(currentRoomId).emit('participant-left', { id: socket.id });
