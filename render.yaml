@@ -1,4 +1,12 @@
-# Blueprint do Render pro VIO.
+# Blueprint do Render pro VIO 2.
+#
+# ATENCAO: o VIO 1 ja roda no Render e e usado. Este blueprint cria um servico
+# NOVO, com nome proprio (vio2). Nunca aponte o servico existente do VIO 1 pra
+# este repositorio: isso substitui o VIO 1 no ar, e quem usa ele perde o acesso.
+#
+# ATENCAO 2: o Render faz deploy da branch padrao do repositorio. Confira que a
+# branch que voce escolher e a que tem a versao que voce quer no ar — o numero
+# aparece em /api/version depois que subir, e na tela de entrada do app.
 #
 # No painel do Render: New > Blueprint > selecione este repositorio.
 # O Render encontra este arquivo sozinho e configura o servico com os
@@ -6,14 +14,19 @@
 #
 # Alternativa manual (sem Blueprint): New > Web Service, selecione o
 # repositorio e preencha:
+#   Name: vio2            (NAO reutilizar o servico do VIO 1)
 #   Runtime: Node
 #   Build Command: npm install
 #   Start Command: npm start
 #   Instance Type: Free
+#
+# Nao precisa de variavel de ambiente: o servidor le a PORT do Render sozinho, e
+# origemPermitida ja libera *.onrender.com. ALLOWED_ORIGINS so entra se um dia
+# houver dominio proprio.
 
 services:
   - type: web
-    name: vio
+    name: vio2
     runtime: node
     plan: free
     buildCommand: npm install
