@@ -97,7 +97,13 @@ Teste manual obrigatório antes de fechar qualquer tarefa que toque em mídia:
 ## Fora de limite
 
 Regras **[HOOK]** são cumpridas por `@.claude/hooks/guard.js`, não por adesão a este texto.
-Texto aqui é pedido; hook é portão. O caso do V0 mostra a diferença: o export **deve** ficar na
+Texto aqui é pedido; hook é portão.
+
+O guard separa duas famílias de regra, e a distinção importa: **convenção** (sem TypeScript,
+sem Tailwind, sem pnpm) vale **só dentro deste repositório** — é opinião do VIO, e não se
+estende a outro projeto aberto na mesma sessão. **Segurança** (`.env`, chave, certificado,
+`node_modules`) vale **em qualquer caminho**: segredo vazado é segredo vazado, esteja onde
+estiver. O caso do V0 mostra a diferença: o export **deve** ficar na
 pasta, é a referência visual de onde o redesenho sai — o que não pode é ele ser commitado junto
 num `git add .`. O hook separa as duas coisas sem depender de ninguém lembrar.
 

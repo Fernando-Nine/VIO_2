@@ -10,16 +10,27 @@
 
 const { execSync } = require('child_process');
 
-const ARQUIVOS_PROIBIDOS = [
+// Regras de CONVENCAO: valem so DENTRO deste repositorio. Elas dizem como o VIO
+// e escrito, e essa opiniao nao se estende a casa dos outros — um segundo
+// projeto na mesma sessao (o VIO_TEST, por exemplo) usa TypeScript e React de
+// proposito. Antes desta separacao o portao barrava qualquer .ts do mundo,
+// porque normalizar() so tira o prefixo quando o caminho esta dentro do repo e,
+// fora dele, sobrava o caminho absoluto pro /\.tsx?$/ casar.
+const REGRAS_DO_PROJETO = [
   { re: /^components\//i, motivo: 'componente React/shadcn — o VIO nao usa framework de front' },
   { re: /^lib\//i, motivo: 'helper de Tailwind/shadcn — o VIO nao usa Tailwind' },
   { re: /^pnpm-(lock|workspace)\.yaml$/i, motivo: 'o VIO usa npm, nao pnpm' },
   { re: /\.tsx?$/i, motivo: 'TypeScript — o VIO e JS puro, sem build' },
   { re: /^public\/placeholder-/i, motivo: 'placeholder de ferramenta visual (V0)' },
+];
+
+// Regras de SEGURANCA: valem em QUALQUER lugar. Segredo vazado e segredo
+// vazado, esteja ele na pasta que estiver — aqui o alcance largo e o certo.
+const REGRAS_UNIVERSAIS = [
   { re: /(^|\/)\.env(\.|$)/i, motivo: 'arquivo de ambiente — pode conter segredo' },
   { re: /\.(pem|key|p12|pfx)$/i, motivo: 'chave ou certificado' },
   { re: /(^|\/)id_(rsa|ed25519)(\.|$)/i, motivo: 'chave SSH' },
-  { re: /^node_modules\//, motivo: 'dependencias instaladas' },
+  { re: /(^|\/)node_modules\//, motivo: 'dependencias instaladas' },
 ];
 
 function git(args) {
@@ -54,18 +65,25 @@ function raizDoRepo() {
   return raizCache;
 }
 
+// Devolve o caminho relativo e se ele esta DENTRO deste repositorio. Caminho
+// relativo conta como interno: no commit os nomes vem do proprio git, ja
+// relativos a raiz.
 function normalizar(caminho) {
-  let rel = String(caminho).replace(/\\/g, '/').replace(/^\.\//, '');
+  const bruto = String(caminho).replace(/\\/g, '/').replace(/^\.\//, '');
   const raiz = raizDoRepo();
-  if (raiz && rel.toLowerCase().startsWith(raiz.toLowerCase() + '/')) {
-    rel = rel.slice(raiz.length + 1);
+  if (raiz && bruto.toLowerCase().startsWith(raiz.toLowerCase() + '/')) {
+    return { rel: bruto.slice(raiz.length + 1), dentro: true };
   }
-  return rel;
+  const absoluto = /^([a-z]:)?\//i.test(bruto);
+  return { rel: bruto, dentro: !absoluto };
 }
 
 function checarProibido(caminho, contexto) {
-  const rel = normalizar(caminho);
-  for (const p of ARQUIVOS_PROIBIDOS) {
+  const { rel, dentro } = normalizar(caminho);
+  const regras = dentro
+    ? [...REGRAS_UNIVERSAIS, ...REGRAS_DO_PROJETO]
+    : REGRAS_UNIVERSAIS;
+  for (const p of regras) {
     if (p.re.test(rel)) {
       bloquear(`${contexto}: "${rel}" — ${p.motivo}. Regra [HOOK] do CLAUDE.md.`);
     }
