@@ -124,18 +124,24 @@ function semLiterais(cmd) {
 function verificarBash(comandoBruto) {
   const comando = semLiterais(comandoBruto);
 
-  if (/\bgit\s+push\b/.test(comando)) {
+  // Isola cada "git push ..." e olha SO o trecho dele. Testar a linha inteira
+  // acusava "git fetch origin main && git push origin minha-branch" como push na
+  // main, porque o "origin main" do fetch casava com o padrao.
+  const pushes = comando.match(/\bgit\s+push\b[^&|;]*/g) || [];
+  if (pushes.length > 0) {
     let branch = '';
     try {
       branch = git('rev-parse --abbrev-ref HEAD');
     } catch { /* fora de repo: cai no teste textual abaixo */ }
-    const alvoMain = /\borigin\s+(main|master)\b/.test(comando) || /\bHEAD:(main|master)\b/.test(comando);
-    const pushImplicito = !/\borigin\s+\S/.test(comando) && (branch === 'main' || branch === 'master');
-    if (alvoMain || pushImplicito) {
-      bloquear(
-        'Push direto na main bloqueado. Abra um PR a partir de uma branch. Regra [HOOK] do CLAUDE.md. ' +
-        '(Voce mesmo pode dar o push no seu terminal — este portao vale para o Claude Code.)'
-      );
+    for (const push of pushes) {
+      const alvoMain = /\borigin\s+(main|master)\b/.test(push) || /\bHEAD:(main|master)\b/.test(push);
+      const pushImplicito = !/\borigin\s+\S/.test(push) && (branch === 'main' || branch === 'master');
+      if (alvoMain || pushImplicito) {
+        bloquear(
+          'Push direto na main bloqueado. Abra um PR a partir de uma branch. Regra [HOOK] do CLAUDE.md. ' +
+          '(Voce mesmo pode dar o push no seu terminal — este portao vale para o Claude Code.)'
+        );
+      }
     }
   }
 
